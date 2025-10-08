@@ -6,7 +6,8 @@
       <input
         type="text"
         required
-        id="text"
+        id="username"
+        autocomplete="off"
         v-model="username"
         placeholder="Enter username..."
       />
@@ -25,6 +26,7 @@ const username = ref('');
 
 const handleAddUser = () => {
   console.log(username.value);
-  // addUser({ name: username.value });
+  addUser({ name: username.value });
+  username.value = '';
 };
 </script>
