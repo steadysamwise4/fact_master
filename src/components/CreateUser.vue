@@ -18,14 +18,22 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useUsers } from '@/composables/useDatabase';
+import { useProblems, useUsers } from '@/composables/useDatabase';
 
 const { addUser } = useUsers();
+const { loading, error, multProblems, divProblems, loadProblems } =
+  useProblems();
 
 const username = ref('');
 
-const handleAddUser = () => {
+const handleAddUser = async () => {
+  // ensure problems are loaded (in case this component is reused without mount)
+  if (!multProblems.value.length && !divProblems.value.length) {
+    await loadProblems();
+  }
   console.log(username.value);
+  console.log('multProblems', multProblems.value);
+  console.log('divProblems', divProblems.value);
   addUser({ name: username.value });
   username.value = '';
 };
