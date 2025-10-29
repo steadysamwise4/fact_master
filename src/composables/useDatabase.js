@@ -20,12 +20,10 @@ export function useUsers() {
   };
 
   const addUser = async (user) => {
-    try {
-      await userRepository.add(user);
-      await fetchUsers(); // Refresh list
-    } catch (e) {
-      error.value = e.message;
-    }
+    const result = await userRepository.add(user);
+    console.log('result:', result);
+    await fetchUsers(); // Refresh list
+    return result;
   };
 
   onMounted(() => {
