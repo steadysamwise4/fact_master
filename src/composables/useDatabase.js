@@ -26,6 +26,16 @@ export function useUsers() {
     return result;
   };
 
+  const removeUser = async (userId) => {
+    try {
+      await userRepository.delete(userId);
+      await fetchUsers(); // Refresh the list
+    } catch (e) {
+      error.value = e.message;
+      throw e;
+    }
+  };
+
   onMounted(() => {
     fetchUsers();
   });
@@ -34,6 +44,7 @@ export function useUsers() {
     users,
     loading,
     error,
+    removeUser,
     fetchUsers,
     addUser,
   };

@@ -1,3 +1,34 @@
+import { createRouter, createWebHistory } from 'vue-router';
+import HomePage from '../views/HomePage.vue';
+import UserSelect from '../views/UserSelect.vue';
+import BattleView from '../views/BattleView.vue';
+
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: HomePage,
+  },
+  {
+    path: '/select-user',
+    name: 'UserSelect',
+    component: UserSelect,
+  },
+  {
+    path: '/battle/:userId',
+    name: 'Battle',
+    component: BattleView,
+    props: true,
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+export default router;
+
 // import { createRouter, createWebHistory } from 'vue-router'
 // import HomeView from '../views/HomeView.vue'
 
