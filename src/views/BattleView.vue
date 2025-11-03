@@ -93,15 +93,26 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
+import { useProblems } from '../composables/useDatabase';
 
 const router = useRouter();
+const route = useRoute();
+
+const { loading, error, multProblems, divProblems, loadProblems } =
+  useProblems();
 
 // Props
 const props = defineProps({
-  playerName: { type: String, default: 'Hero' },
-  problemSet: { type: Array, default: () => [] },
-  playerMaxHp: { type: Number, default: 100 },
+  userId: { type: String, required: true },
+});
+
+// Read from query with fallbacks
+const kind = computed(() => String(route.query.kind ?? 'mult'));
+const playerName = computed(() => String(route.query.name ?? 'Hero'));
+const playerMaxHp = computed(() => {
+  const n = Number(route.query.hp);
+  return Number.isFinite(n) && n > 0 ? n : 100;
 });
 
 // Emit events
@@ -112,7 +123,7 @@ const battleState = ref('question'); // 'question', 'message', 'victory', 'defea
 const battleMessage = ref('');
 
 // Player stats
-const playerHp = ref(props.playerMaxHp);
+const playerHp = ref(playerMaxHp.value);
 const playerAnswer = ref('');
 const answerInput = ref(null);
 const playerAttacking = ref(false);
@@ -132,13 +143,33 @@ const showEnemyDamage = ref(false);
 const lastDamage = ref(0);
 
 // Problem tracking
+const problemSet = computed(() => {
+  if (loading.value || error.value) return [];
+  return kind.value === 'div'
+    ? divProblems.value ?? []
+    : multProblems.value ?? [];
+});
+
+function toBattleProblems(arr) {
+  return (arr ?? []).map((p) => ({
+    id: p.id,
+    question:
+      p.prompt ??
+      `${p.factors?.[0]} ${p.symbol === 'x' ? '×' : p.symbol || '×'} ${
+        p.factors?.[1]
+      } =`,
+    answer: p.solution,
+  }));
+}
+const battleProblems = computed(() => toBattleProblems(problemSet.value));
 const currentProblemIndex = ref(0);
 const currentProblem = computed(() => {
-  if (props.problemSet.length === 0) {
+  console.log('battleProblems:', battleProblems.value);
+  if (battleProblems.value.length === 0) {
     return { question: '5 × 7', answer: 35 };
   }
   return (
-    props.problemSet[currentProblemIndex.value] || {
+    battleProblems.value[currentProblemIndex.value] || {
       question: '5 × 7',
       answer: 35,
     }
@@ -147,7 +178,7 @@ const currentProblem = computed(() => {
 
 // Computed
 const playerHpPercent = computed(
-  () => (playerHp.value / props.playerMaxHp) * 100
+  () => (playerHp.value / playerMaxHp.value) * 100
 );
 const enemyHpPercent = computed(
   () => (enemyHp.value / currentEnemy.value.maxHp) * 100
@@ -162,7 +193,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Methods
 const submitAnswer = async () => {
-  if (!playerAnswer.value) return;
+  const parsed = parseInt(playerAnswer.value, 10);
+  if (Number.isNaN(parsed)) return;
 
   const isCorrect =
     parseInt(playerAnswer.value) === currentProblem.value.answer;
@@ -183,7 +215,7 @@ const submitAnswer = async () => {
   } else {
     // Next question
     currentProblemIndex.value++;
-    if (currentProblemIndex.value >= props.problemSet.length) {
+    if (currentProblemIndex.value >= battleProblems.value.length) {
       currentProblemIndex.value = 0; // Loop problems
     }
     battleState.value = 'question';
@@ -194,7 +226,7 @@ const submitAnswer = async () => {
 
 const playerAttack = async () => {
   battleState.value = 'message';
-  battleMessage.value = `${props.playerName} attacks!`;
+  battleMessage.value = `${playerName.value} attacks!`;
 
   // Attack animation
   playerAttacking.value = true;
@@ -260,7 +292,7 @@ const nextBattle = () => {
 
 const retry = () => {
   // Reset everything
-  playerHp.value = props.playerMaxHp;
+  playerHp.value = playerMaxHp.value;
   enemyHp.value = currentEnemy.value.maxHp;
   enemyDefeated.value = false;
   currentProblemIndex.value = 0;
@@ -272,7 +304,8 @@ const exitBattle = () => {
   router.push('/select-user');
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await loadProblems;
   answerInput.value?.focus();
 });
 </script>
