@@ -162,6 +162,7 @@ function toBattleProblems(arr) {
   }));
 }
 const battleProblems = computed(() => toBattleProblems(problemSet.value));
+const currentProblemCount = ref(0);
 const currentProblemIndex = ref(0);
 const currentProblem = computed(() => {
   console.log('battleProblems:', battleProblems.value);
@@ -188,8 +189,14 @@ const playerSprite = computed(
 ); // Placeholder
 const xpGained = computed(() => Math.floor(currentEnemy.value.maxHp / 2));
 
-// Helper function
+// Helper functions
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getRandomInteger(min, max) {
+  min = Math.ceil(min); // Ensures min is an integer
+  max = Math.floor(max); // Ensures max is an integer
+  return Math.floor(Math.random() * (max - min)) + min;
+}
 
 // Methods
 const submitAnswer = async () => {
@@ -214,10 +221,9 @@ const submitAnswer = async () => {
     await handleDefeat();
   } else {
     // Next question
-    currentProblemIndex.value++;
-    if (currentProblemIndex.value >= battleProblems.value.length) {
-      currentProblemIndex.value = 0; // Loop problems
-    }
+    const randomIndex = getRandomInteger(0, battleProblems.value.length);
+    currentProblemIndex.value = randomIndex;
+
     battleState.value = 'question';
     await nextTick();
     answerInput.value?.focus();
@@ -272,7 +278,7 @@ const handleVictory = async () => {
   battleState.value = 'victory';
   emit('battleComplete', {
     xp: xpGained.value,
-    problemsAttempted: currentProblemIndex.value + 1,
+    problemsAttempted: currentProblemCount.value + 1,
   });
 };
 
@@ -285,7 +291,7 @@ const nextBattle = () => {
   // Reset for next battle
   enemyHp.value = currentEnemy.value.maxHp;
   enemyDefeated.value = false;
-  currentProblemIndex.value = 0;
+  currentProblemIndex.value = getRandomInteger(0, battleProblems.value.length);
   battleState.value = 'question';
   nextTick(() => answerInput.value?.focus());
 };
@@ -295,7 +301,7 @@ const retry = () => {
   playerHp.value = playerMaxHp.value;
   enemyHp.value = currentEnemy.value.maxHp;
   enemyDefeated.value = false;
-  currentProblemIndex.value = 0;
+  currentProblemIndex.value = getRandomInteger(0, battleProblems.value.length);
   battleState.value = 'question';
   nextTick(() => answerInput.value?.focus());
 };
@@ -305,7 +311,9 @@ const exitBattle = () => {
 };
 
 onMounted(async () => {
-  await loadProblems;
+  await loadProblems();
+  const len = battleProblems.value.length;
+  if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);
   answerInput.value?.focus();
 });
 </script>
