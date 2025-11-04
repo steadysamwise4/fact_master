@@ -21,7 +21,6 @@ export function useUsers() {
 
   const addUser = async (user) => {
     const result = await userRepository.add(user);
-    console.log('result:', result);
     await fetchUsers(); // Refresh list
     return result;
   };

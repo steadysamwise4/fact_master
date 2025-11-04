@@ -6,12 +6,8 @@ export async function seedProblemsIfEmpty(db) {
   const hasAnyDiv = await countStore(db, DIV_STORE);
   if (hasAnyMult > 0 || hasAnyDiv > 0) return;
 
-  console.log('seeding multiplication and division problems...');
-
   const allOrderedMultiplication = generateMultiplicationProblems(0, 10, true);
   const allOrderedDivision = generateDivisionProblems();
-  console.log(allOrderedMultiplication);
-  console.log(allOrderedDivision);
 
   await putMany(db, MULT_STORE, allOrderedMultiplication);
   await putMany(db, DIV_STORE, allOrderedDivision);

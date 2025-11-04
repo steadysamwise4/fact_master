@@ -40,11 +40,9 @@ const handleAddUser = async () => {
   if (!multProblems.value.length && !divProblems.value.length) {
     await loadProblems();
   }
-  console.log(username.value);
   const multData = constructUserData(multProblems.value);
   const divData = constructUserData(divProblems.value);
-  console.log('multProblems', multProblems.value);
-  console.log('divProblems', divProblems.value);
+
   try {
     await addUser({ name: username.value, multData, divData });
     username.value = '';
