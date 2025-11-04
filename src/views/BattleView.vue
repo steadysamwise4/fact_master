@@ -110,9 +110,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProblems } from '../composables/useDatabase';
+import { useRafTimer } from '@/composables/useRafTimer';
 
 const router = useRouter();
 const route = useRoute();
@@ -192,7 +193,7 @@ const battleProblems = computed(() => toBattleProblems(problemSet.value));
 const currentProblemCount = ref(0);
 const currentProblemIndex = ref(0);
 const currentProblem = computed(() => {
-  console.log('battleProblems:', battleProblems.value);
+  // console.log('battleProblems:', battleProblems.value);
   if (battleProblems.value.length === 0) {
     return { question: '5 × 7', answer: 35 };
   }
@@ -205,59 +206,10 @@ const currentProblem = computed(() => {
 });
 
 // Timer
-const durationMs = 20000;
-let rafId = 0;
-let baseTs = 0;
-const progress = ref(1);
-const timerRunning = ref(false);
-
-function startTimer() {
-  if (timerRunning.value) return;
-  timerRunning.value = true;
-  baseTs = 0;
-  rafId = requestAnimationFrame(tick);
-}
-
-function stopTimer() {
-  console.log('stopTimer called, rafId=', rafId);
-  if (rafId) cancelAnimationFrame(rafId);
-  rafId = 0;
-  timerRunning.value = false;
-}
-function resetTimer() {
-  console.log('resetTimer called');
-  stopTimer();
-  progress.value = 1;
-}
-
-function tick(ts) {
-  if (!baseTs) {
-    baseTs = ts;
-    console.log('base set', baseTs);
-  }
-  const elapsed = ts - baseTs;
-  const remaining = Math.max(0, durationMs - elapsed);
-  progress.value = remaining / durationMs;
-
-  if (remaining > 0 && timerRunning.value) {
-    console.log(
-      'tick -> schedule next rAF, remaining=',
-      Math.round(remaining),
-      'running=',
-      timerRunning.value
-    );
-    rafId = requestAnimationFrame(tick);
-  } else {
-    console.log(
-      'tick -> stop, remaining=',
-      Math.round(remaining),
-      'running=',
-      timerRunning.value
-    );
-    timerRunning.value = false;
-    void onTimerDone();
-  }
-}
+const { progress, running, start, stop, reset } = useRafTimer(
+  20000,
+  onTimerDone
+);
 
 async function onTimerDone() {
   await enemyAttack();
@@ -273,43 +225,6 @@ async function onTimerDone() {
     answerInput.value?.focus();
   }
 }
-
-// async function tick() {
-//   const elapsed = performance.now() - startAt;
-//   const remaining = Math.max(0, durationMs - elapsed);
-//   progress.value = remaining / durationMs;
-//   if (Math.round(remaining) % 1000 < 16)
-//     console.log('[timer] remaining ms', Math.round(remaining));
-//   if (remaining > 0) {
-//     try {
-//       console.log('inside tick try!');
-//       rafId = requestAnimationFrame(tick);
-//       console.log('after requestAnimationFrame(tick)');
-//     } catch (e) {
-//       console.error('[begin] pre-startTimer error:', e);
-//     }
-//   } else {
-//     timerRunning.value = false;
-//     console.log('[timer] done');
-//     // time up: trigger wrong/attack/etc.
-//     await enemyAttack();
-
-//     // Check for battle end
-//     if (enemyHp.value <= 0) {
-//       await handleVictory();
-//     } else if (playerHp.value <= 0) {
-//       await handleDefeat();
-//     } else {
-//       // Next question
-//       const randomIndex = getRandomInteger(0, battleProblems.value.length);
-//       currentProblemIndex.value = randomIndex;
-
-//       battleState.value = 'ready';
-//       await nextTick();
-//       answerInput.value?.focus();
-//     }
-//   }
-// }
 
 // Computed
 const playerHpPercent = computed(
@@ -338,15 +253,16 @@ let justStartedAt = 0;
 
 async function beginBattle(e) {
   e?.preventDefault?.();
-  if (starting || timerRunning.value) return;
+  if (starting || running.value) return;
   starting = true;
   justStartedAt = performance.now();
 
   battleState.value = 'question';
-  resetTimer();
+  reset();
   await nextTick();
 
-  startTimer();
+  // start first, then focus next frame
+  start();
   requestAnimationFrame(() =>
     answerInput.value?.focus({ preventScroll: true })
   );
@@ -358,44 +274,9 @@ function onAnswerEnter(e) {
   if (performance.now() - justStartedAt < 250) return; // swallow the starting Enter
   submitAnswer();
 }
-// async function beginBattle() {
-//   console.log('[begin] start, timerRunning=', timerRunning.value);
-//   battleState.value = 'question';
-//   resetTimer();
-//   await nextTick();
-//   console.log(
-//     '[begin] before startTimer, progress=',
-
-//     progress.value,
-//     'timerRunning=',
-//     timerRunning.value
-//   );
-//   answerInput.value?.focus();
-//   setTimeout(startTimer, 0);
-
-//   console.log('[begin] after startTimer, baseTs=', baseTs);
-// }
-
-// async function beginBattle() {
-//   if (timerRunning.value) return;
-//   console.log('[begin] start');
-//   battleState.value = 'question';
-//   resetTimer(); // sets progress=1
-//   console.log('[begin] after reset, progress=', progress.value);
-//   try {
-//     await nextTick();
-//     console.log('[begin] after nextTick, focusing input');
-//     await new Promise(requestAnimationFrame);
-//     answerInput.value?.focus();
-//     startTimer();
-//     console.log('[begin] startTimer called');
-//   } catch (e) {
-//     console.error('[begin] pre-startTimer error:', e);
-//   }
-// }
 
 const submitAnswer = async () => {
-  stopTimer();
+  stop();
   const parsed = parseInt(playerAnswer.value, 10);
   if (Number.isNaN(parsed)) return;
 
@@ -511,11 +392,6 @@ onMounted(async () => {
   const len = battleProblems.value.length;
   if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);
   startBtn.value?.focus();
-});
-
-onUnmounted(() => {
-  console.log('[BattleView] unmounted -> stopping timer');
-  stopTimer();
 });
 </script>
 
