@@ -42,12 +42,14 @@
 
               <div class="hero-actions" v-if="selectedUser?.id === user.id">
                 <button
+                  type="button"
                   class="medieval-btn"
                   @click.stop="startBattle(user, 'mult')"
                 >
                   Multiplication
                 </button>
                 <button
+                  type="button"
                   class="medieval-btn"
                   @click.stop="startBattle(user, 'div')"
                 >

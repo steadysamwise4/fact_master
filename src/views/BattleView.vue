@@ -51,7 +51,14 @@
     </div>
 
     <!-- Battle UI -->
-    <div class="battle-ui">
+    <div v-if="battleState === 'ready'">
+      <form @submit.prevent="beginBattle">
+        <button type="submit" class="btn btn-action" ref="startBtn">
+          Start Battle
+        </button>
+      </form>
+    </div>
+    <div v-else class="battle-ui">
       <!-- Problem Display -->
       <div v-if="battleState === 'question'" class="problem-box">
         <div class="problem-text">{{ currentProblem.question }}</div>
@@ -60,9 +67,20 @@
           v-model="playerAnswer"
           type="number"
           class="answer-input"
-          @keyup.enter="submitAnswer"
+          @keydown.enter.prevent="onAnswerEnter"
           placeholder="Your answer"
         />
+        <div class="timebar">
+          <div
+            class="timebar-empty"
+            :style="{ width: 100 - progress * 100 + '%' }"
+          ></div>
+          <div class="timebar-seg s1"></div>
+          <div class="timebar-seg s2"></div>
+          <div class="timebar-seg s3"></div>
+          <div class="timebar-seg s4"></div>
+          <div class="timebar-seg s5"></div>
+        </div>
         <button @click="submitAnswer" class="submit-btn">Attack!</button>
       </div>
 
@@ -92,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProblems } from '../composables/useDatabase';
 
@@ -119,8 +137,17 @@ const playerMaxHp = computed(() => {
 const emit = defineEmits(['battleComplete', 'battleFailed']);
 
 // Battle state
-const battleState = ref('question'); // 'question', 'message', 'victory', 'defeat'
+const battleState = ref('ready');
 const battleMessage = ref('');
+
+// Start Button
+const startBtn = ref(null);
+watch(
+  () => battleState.value,
+  (s) => {
+    if (s === 'ready') nextTick(() => startBtn.value?.focus());
+  }
+);
 
 // Player stats
 const playerHp = ref(playerMaxHp.value);
@@ -177,6 +204,113 @@ const currentProblem = computed(() => {
   );
 });
 
+// Timer
+const durationMs = 20000;
+let rafId = 0;
+let baseTs = 0;
+const progress = ref(1);
+const timerRunning = ref(false);
+
+function startTimer() {
+  if (timerRunning.value) return;
+  timerRunning.value = true;
+  baseTs = 0;
+  rafId = requestAnimationFrame(tick);
+}
+
+function stopTimer() {
+  console.log('stopTimer called, rafId=', rafId);
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = 0;
+  timerRunning.value = false;
+}
+function resetTimer() {
+  console.log('resetTimer called');
+  stopTimer();
+  progress.value = 1;
+}
+
+function tick(ts) {
+  if (!baseTs) {
+    baseTs = ts;
+    console.log('base set', baseTs);
+  }
+  const elapsed = ts - baseTs;
+  const remaining = Math.max(0, durationMs - elapsed);
+  progress.value = remaining / durationMs;
+
+  if (remaining > 0 && timerRunning.value) {
+    console.log(
+      'tick -> schedule next rAF, remaining=',
+      Math.round(remaining),
+      'running=',
+      timerRunning.value
+    );
+    rafId = requestAnimationFrame(tick);
+  } else {
+    console.log(
+      'tick -> stop, remaining=',
+      Math.round(remaining),
+      'running=',
+      timerRunning.value
+    );
+    timerRunning.value = false;
+    void onTimerDone();
+  }
+}
+
+async function onTimerDone() {
+  await enemyAttack();
+  if (enemyHp.value <= 0) {
+    await handleVictory();
+  } else if (playerHp.value <= 0) {
+    await handleDefeat();
+  } else {
+    const randomIndex = getRandomInteger(0, battleProblems.value.length);
+    currentProblemIndex.value = randomIndex;
+    battleState.value = 'ready';
+    await nextTick();
+    answerInput.value?.focus();
+  }
+}
+
+// async function tick() {
+//   const elapsed = performance.now() - startAt;
+//   const remaining = Math.max(0, durationMs - elapsed);
+//   progress.value = remaining / durationMs;
+//   if (Math.round(remaining) % 1000 < 16)
+//     console.log('[timer] remaining ms', Math.round(remaining));
+//   if (remaining > 0) {
+//     try {
+//       console.log('inside tick try!');
+//       rafId = requestAnimationFrame(tick);
+//       console.log('after requestAnimationFrame(tick)');
+//     } catch (e) {
+//       console.error('[begin] pre-startTimer error:', e);
+//     }
+//   } else {
+//     timerRunning.value = false;
+//     console.log('[timer] done');
+//     // time up: trigger wrong/attack/etc.
+//     await enemyAttack();
+
+//     // Check for battle end
+//     if (enemyHp.value <= 0) {
+//       await handleVictory();
+//     } else if (playerHp.value <= 0) {
+//       await handleDefeat();
+//     } else {
+//       // Next question
+//       const randomIndex = getRandomInteger(0, battleProblems.value.length);
+//       currentProblemIndex.value = randomIndex;
+
+//       battleState.value = 'ready';
+//       await nextTick();
+//       answerInput.value?.focus();
+//     }
+//   }
+// }
+
 // Computed
 const playerHpPercent = computed(
   () => (playerHp.value / playerMaxHp.value) * 100
@@ -199,7 +333,69 @@ function getRandomInteger(min, max) {
 }
 
 // Methods
+let starting = false;
+let justStartedAt = 0;
+
+async function beginBattle(e) {
+  e?.preventDefault?.();
+  if (starting || timerRunning.value) return;
+  starting = true;
+  justStartedAt = performance.now();
+
+  battleState.value = 'question';
+  resetTimer();
+  await nextTick();
+
+  startTimer();
+  requestAnimationFrame(() =>
+    answerInput.value?.focus({ preventScroll: true })
+  );
+
+  starting = false;
+}
+
+function onAnswerEnter(e) {
+  if (performance.now() - justStartedAt < 250) return; // swallow the starting Enter
+  submitAnswer();
+}
+// async function beginBattle() {
+//   console.log('[begin] start, timerRunning=', timerRunning.value);
+//   battleState.value = 'question';
+//   resetTimer();
+//   await nextTick();
+//   console.log(
+//     '[begin] before startTimer, progress=',
+
+//     progress.value,
+//     'timerRunning=',
+//     timerRunning.value
+//   );
+//   answerInput.value?.focus();
+//   setTimeout(startTimer, 0);
+
+//   console.log('[begin] after startTimer, baseTs=', baseTs);
+// }
+
+// async function beginBattle() {
+//   if (timerRunning.value) return;
+//   console.log('[begin] start');
+//   battleState.value = 'question';
+//   resetTimer(); // sets progress=1
+//   console.log('[begin] after reset, progress=', progress.value);
+//   try {
+//     await nextTick();
+//     console.log('[begin] after nextTick, focusing input');
+//     await new Promise(requestAnimationFrame);
+//     answerInput.value?.focus();
+//     startTimer();
+//     console.log('[begin] startTimer called');
+//   } catch (e) {
+//     console.error('[begin] pre-startTimer error:', e);
+//   }
+// }
+
 const submitAnswer = async () => {
+  stopTimer();
   const parsed = parseInt(playerAnswer.value, 10);
   if (Number.isNaN(parsed)) return;
 
@@ -224,7 +420,7 @@ const submitAnswer = async () => {
     const randomIndex = getRandomInteger(0, battleProblems.value.length);
     currentProblemIndex.value = randomIndex;
 
-    battleState.value = 'question';
+    battleState.value = 'ready';
     await nextTick();
     answerInput.value?.focus();
   }
@@ -314,7 +510,12 @@ onMounted(async () => {
   await loadProblems();
   const len = battleProblems.value.length;
   if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);
-  answerInput.value?.focus();
+  startBtn.value?.focus();
+});
+
+onUnmounted(() => {
+  console.log('[BattleView] unmounted -> stopping timer');
+  stopTimer();
 });
 </script>
 
@@ -618,6 +819,55 @@ onMounted(async () => {
 
 .answer-input::placeholder {
   color: #8b7355;
+}
+.timebar {
+  position: relative;
+  height: 20px;
+  background: linear-gradient(
+    to right,
+    #dc2626 0 40%,
+    #f59e0b 40% 80%,
+    #16a34a 80% 100%
+  );
+  border: 2px solid #8b6914;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* “empty” overlay that covers the gradient from right to left */
+.timebar-empty {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 0%; /* start at 0 (fully colored) */
+  background: #2b1a12; /* empty bar color */
+  transition: width 80ms linear;
+}
+
+/* segments unchanged */
+.timebar-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 215, 0, 0.35);
+  pointer-events: none;
+}
+.timebar-seg.s1 {
+  left: 20%;
+}
+.timebar-seg.s2 {
+  left: 40%;
+}
+.timebar-seg.s3 {
+  left: 60%;
+}
+.timebar-seg.s4 {
+  left: 80%;
+}
+.timebar-seg.s5 {
+  display: none;
 }
 
 .submit-btn {
