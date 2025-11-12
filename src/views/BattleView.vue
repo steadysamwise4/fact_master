@@ -206,7 +206,7 @@ const currentProblem = computed(() => {
 });
 
 // Timer
-const { progress, running, start, stop, reset } = useRafTimer(
+const { progress, running, lastDurationSec, start, stop, reset } = useRafTimer(
   20000,
   onTimerDone
 );
@@ -276,12 +276,14 @@ function onAnswerEnter(e) {
 }
 
 const submitAnswer = async () => {
+  if (!playerAnswer.value) return;
   stop();
   const parsed = parseInt(playerAnswer.value, 10);
   if (Number.isNaN(parsed)) return;
 
   const isCorrect =
     parseInt(playerAnswer.value) === currentProblem.value.answer;
+  console.log('lastDurationSec:', lastDurationSec.value);
 
   if (isCorrect) {
     await playerAttack();

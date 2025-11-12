@@ -1,6 +1,6 @@
 import { seedProblemsIfEmpty } from './seed';
 
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbInstance = null;
 
@@ -39,6 +39,16 @@ export const initDB = () => {
           keyPath: 'id',
           autoIncrement: false,
         });
+      }
+
+      if (!db.objectStoreNames.contains('userProblems')) {
+        // Use composite key; include type if IDs aren’t globally unique
+        const up = db.createObjectStore('userProblems', {
+          keyPath: ['userId', 'problemId'],
+        });
+        up.createIndex('byUser', 'userId');
+        up.createIndex('byProblem', 'problemId');
+        up.createIndex('byUserAndProblemType', ['userId', 'problemType']);
       }
       // Add more stores as needed
     };

@@ -1,6 +1,7 @@
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { userRepository } from '@/services/db/repositories/userRepository';
 import { problemRepository } from '../services/db/repositories/problemRepository';
+import { userProblemRepository as repo } from '@/services/db/repositories/userProblemRepository';
 
 export function useUsers() {
   const users = ref([]);
@@ -20,9 +21,10 @@ export function useUsers() {
   };
 
   const addUser = async (user) => {
-    const result = await userRepository.add(user);
+    const userId = await userRepository.add(user);
+
     await fetchUsers(); // Refresh list
-    return result;
+    return userId;
   };
 
   const removeUser = async (userId) => {
@@ -81,5 +83,71 @@ export function useProblems() {
     loadProblems,
     multProblems,
     divProblems,
+  };
+}
+
+export function useUserProblems() {
+  const userId = ref(null);
+  const items = ref([]); // last fetched set
+  const loading = ref(false);
+  const error = ref(null);
+
+  function setUserId(id) {
+    userId.value = id;
+  }
+
+  async function fetchAll() {
+    if (!userId.value) return;
+    loading.value = true;
+    error.value = null;
+    try {
+      items.value = await repo.listByUser(userId.value);
+    } catch (e) {
+      error.value = e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchByType(type) {
+    if (!userId.value) return;
+    loading.value = true;
+    error.value = null;
+    try {
+      items.value = await repo.listByUserAndType(userId.value, type);
+    } catch (e) {
+      error.value = e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function getOne(problemId) {
+    if (!userId.value) return null;
+    return repo.getUserProblem(userId.value, problemId);
+  }
+
+  async function seed(problems) {
+    if (!userId.value) return;
+    await repo.seedUserProblems(userId.value, problems);
+    // Optional: refresh
+    // await fetchAll();
+  }
+
+  async function update(problemId, patch) {
+    if (!userId.value) return;
+    await repo.updateUserProblem({ userId: userId.value, problemId, patch });
+  }
+
+  return {
+    items,
+    loading,
+    error,
+    setUserId,
+    fetchAll,
+    fetchByType,
+    getOne,
+    seed,
+    update,
   };
 }

@@ -2,8 +2,9 @@
 import { ref, onUnmounted } from 'vue';
 
 export function useRafTimer(durationMs = 20000, onDone = null) {
-  const progress = ref(1);
+  const progress = ref(1); // 1 -> 0
   const running = ref(false);
+  const lastDurationSec = ref(null); // elapsed seconds for last run
 
   let rafId = 0;
   let baseTs = 0;
@@ -19,7 +20,9 @@ export function useRafTimer(durationMs = 20000, onDone = null) {
     } else {
       running.value = false;
       rafId = 0;
-      onDone && onDone(); // fire completion
+      // capture total elapsed for this question
+      lastDurationSec.value = Math.round((durationMs - remaining) / 1000);
+      onDone && onDone();
     }
   }
 
@@ -27,18 +30,38 @@ export function useRafTimer(durationMs = 20000, onDone = null) {
     if (running.value) return;
     running.value = true;
     baseTs = 0;
+    lastDurationSec.value = null;
     rafId = requestAnimationFrame(tick);
   }
+
   function stop() {
-    if (rafId) cancelAnimationFrame(rafId);
+    if (!running.value) return;
+    cancelAnimationFrame(rafId);
     rafId = 0;
     running.value = false;
+    // compute elapsed at stop
+    const remaining = progress.value * durationMs;
+    lastDurationSec.value = Math.round((durationMs - remaining) / 1000);
   }
+
   function reset() {
     stop();
     progress.value = 1;
   }
 
+  // optional: convenience getter
+  function getElapsedMs() {
+    return (1 - progress.value) * durationMs;
+  }
+
   onUnmounted(stop);
-  return { progress, running, start, stop, reset };
+  return {
+    progress,
+    running,
+    start,
+    stop,
+    reset,
+    lastDurationSec,
+    getElapsedMs,
+  };
 }

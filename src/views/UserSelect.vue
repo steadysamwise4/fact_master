@@ -106,7 +106,9 @@
             </div>
           </form>
 
-          <div v-if="error" class="error-message">{{ error }}</div>
+          <div v-if="userProblemsError" class="error-message">
+            {{ userProblemsError }}
+          </div>
         </div>
 
         <button @click="goHome" class="back-btn">← Back to Home</button>
@@ -120,13 +122,33 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { useProblems, useUsers } from '@/composables/useDatabase';
+import {
+  useProblems,
+  useUserProblems,
+  useUsers,
+} from '@/composables/useDatabase';
 
 const router = useRouter();
 
 const { addUser, users, removeUser } = useUsers();
-const { loading, error, multProblems, divProblems, loadProblems } =
-  useProblems();
+const {
+  loading: problemsLoading,
+  error: problemsError,
+  multProblems,
+  divProblems,
+  loadProblems,
+} = useProblems();
+
+const {
+  items,
+  loading: userProblemsLoading,
+  error: userProblemsError,
+  setUserId,
+  fetchAll,
+  fetchByType,
+  update,
+  seed,
+} = useUserProblems();
 
 const username = ref('');
 
@@ -142,14 +164,15 @@ const handleAddUser = async () => {
     await loadProblems();
   }
 
-  const multData = constructUserData(multProblems.value);
-  const divData = constructUserData(divProblems.value);
-
   try {
-    await addUser({ name: username.value, multData, divData });
+    const newUserId = await addUser(constructUserData(username.value));
     username.value = '';
+    console.log('inside handleUser', newUserId);
+    setUserId(newUserId);
+
+    await Promise.all([seed(multProblems.value), seed(divProblems.value)]);
   } catch (e) {
-    error.value = e.message;
+    userProblemsError.value = e.message;
     alert(e.message);
   }
 };
@@ -180,21 +203,38 @@ const goHome = () => {
   router.push('/');
 };
 
-const constructUserData = (problemSet) => {
-  const problemObj = {};
+const addUserProblems = (problemSet, userId) => {
   problemSet.forEach((prob) => {
-    problemObj[prob.id] = {
+    const problemObj = {
+      userId,
+      problemId: prob.id,
+      type: prob.operation,
       answerTimes: [20, 20, 20, 20, 20],
-      avgTime: 20,
+      answerTimeAvg: 20,
       mastered: false,
     };
   });
-  return problemObj;
 };
 
 const getMasteredCount = (problemData) => {
   if (!problemData) return 0;
   return Object.values(problemData).filter((p) => p.mastered).length;
+};
+
+const constructUserData = (name) => {
+  return {
+    name,
+    xp: 0,
+    level: 1,
+    achievements: [],
+    totalProbsAttempted: 0,
+    totalProbsCorrect: 0,
+    totalMultAttempted: 0,
+    totalMultCorrect: 0,
+    totalDivAttempted: 0,
+    totalDivCorrect: 0,
+    streak: 0,
+  };
 };
 </script>
 
