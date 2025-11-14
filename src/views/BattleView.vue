@@ -299,10 +299,10 @@ function onAnswerEnter(e) {
 }
 
 const submitAnswer = async () => {
-  if (!playerAnswer.value) return;
-  stop();
   const parsed = parseInt(playerAnswer.value, 10);
   if (Number.isNaN(parsed)) return;
+
+  stop();
 
   const isCorrect =
     parseInt(playerAnswer.value) === currentProblem.value.answer;
@@ -459,9 +459,12 @@ const nextBattle = () => {
   // Reset for next battle
   enemyHp.value = currentEnemy.value.maxHp;
   enemyDefeated.value = false;
+  playerHp.value = playerMaxHp.value;
   currentProblemIndex.value = getRandomInteger(0, battleProblems.value.length);
   battleState.value = 'question';
+  reset();
   nextTick(() => answerInput.value?.focus());
+  start();
 };
 
 const retry = () => {

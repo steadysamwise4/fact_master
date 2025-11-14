@@ -45,8 +45,13 @@ export function useRafTimer(durationMs = 20000, onDone = null) {
   }
 
   function reset() {
-    stop();
+    // hard reset regardless of running state
+    if (rafId) cancelAnimationFrame(rafId);
+    running.value = false;
+    rafId = 0;
+    baseTs = 0;
     progress.value = 1;
+    lastDurationSec.value = null;
   }
 
   // optional: convenience getter
