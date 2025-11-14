@@ -27,11 +27,38 @@ export function useUsers() {
     return userId;
   };
 
+  const getOneUser = async (userId) => {
+    try {
+      console.log('userId inside getOneUser', userId);
+      const user = await userRepository.getById(userId);
+      console.log('inside getOneUser', user);
+      return user;
+    } catch (e) {
+      error.value = e?.message ?? String(e);
+      throw e;
+    }
+  };
+
   const removeUser = async (userId) => {
     try {
       await userRepository.delete(userId);
       await fetchUsers(); // Refresh the list
     } catch (e) {
+      error.value = e.message;
+      throw e;
+    }
+  };
+
+  const updateUserPatch = async (id, patch) => {
+    const idx = users.value.findIndex((u) => u.id === id);
+    const prev = idx >= 0 ? { ...users.value[idx] } : null;
+
+    if (idx >= 0) users.value[idx] = { ...users.value[idx], ...patch };
+
+    try {
+      await userRepository.patch(id, patch); // implement in repo
+    } catch (e) {
+      if (idx >= 0) users.value[idx] = prev; // rollback
       error.value = e.message;
       throw e;
     }
@@ -48,6 +75,8 @@ export function useUsers() {
     removeUser,
     fetchUsers,
     addUser,
+    getOneUser,
+    updateUserPatch,
   };
 }
 
@@ -96,7 +125,7 @@ export function useUserProblems() {
     userId.value = id;
   }
 
-  async function fetchAll() {
+  async function fetchAllUP() {
     if (!userId.value) return;
     loading.value = true;
     error.value = null;
@@ -109,7 +138,7 @@ export function useUserProblems() {
     }
   }
 
-  async function fetchByType(type) {
+  async function fetchUPByType(type) {
     if (!userId.value) return;
     loading.value = true;
     error.value = null;
@@ -122,19 +151,19 @@ export function useUserProblems() {
     }
   }
 
-  async function getOne(problemId) {
+  async function getOneUserProb(problemId) {
     if (!userId.value) return null;
     return repo.getUserProblem(userId.value, problemId);
   }
 
-  async function seed(problems) {
+  async function seedUserProbs(problems) {
     if (!userId.value) return;
     await repo.seedUserProblems(userId.value, problems);
     // Optional: refresh
     // await fetchAll();
   }
 
-  async function update(problemId, patch) {
+  async function updateUserProb(problemId, patch) {
     if (!userId.value) return;
     await repo.updateUserProblem({ userId: userId.value, problemId, patch });
   }
@@ -144,10 +173,10 @@ export function useUserProblems() {
     loading,
     error,
     setUserId,
-    fetchAll,
-    fetchByType,
-    getOne,
-    seed,
-    update,
+    fetchAllUP,
+    fetchUPByType,
+    getOneUserProb,
+    seedUserProbs,
+    updateUserProb,
   };
 }

@@ -52,33 +52,34 @@ const handleAddUser = async () => {
   }
 };
 
-const constructUserData = (problemSet) => {
-  const problemObj = {};
+const seedUserProblemData = (problemSet, userId) => {
   problemSet.forEach((prob) => {
-    problemObj[prob.id] = {
+    const userProblem = {
+      problemId: prob.id,
+      userId,
       answerTimes: [20, 20, 20, 20, 20],
-      avgTime: 20,
+      avgSec: 20,
       mastered: false,
+      type: prob.operation,
     };
   });
   return problemObj;
 };
 
-// TODO: Figure out where this lives
-function updateProblemStats(problemData, problemId, newTime) {
-  const problem = problemData[problemId];
-
-  // Update times
-  problem.answerTimes.shift();
-  problem.answerTimes.push(newTime);
-
-  // Recalculate average
-  problem.avgTime =
-    problem.answerTimes.reduce((a, b) => a + b) / problem.answerTimes.length;
-
-  // Update mastery status
-  problem.mastered = problem.avgTime < 3; // or whatever your threshold is
-}
+const constructUserData = () => {
+  return {
+    xp: 0,
+    level: 1,
+    achievements: [],
+    totalProbsAttempted: 0,
+    totalProbsCorrect: 0,
+    totalMultAttempted: 0,
+    totalMultCorrect: 0,
+    totalDivAttempted: 0,
+    totalDivCorrect: 0,
+    streak,
+  };
+};
 
 // To derive total count TODO: Figure out where this lives
 function getMasteredCount(problemData) {

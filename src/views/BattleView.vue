@@ -112,14 +112,37 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { useProblems } from '../composables/useDatabase';
+import {
+  useProblems,
+  useUserProblems,
+  useUsers,
+} from '../composables/useDatabase';
 import { useRafTimer } from '@/composables/useRafTimer';
 
 const router = useRouter();
 const route = useRoute();
 
-const { loading, error, multProblems, divProblems, loadProblems } =
-  useProblems();
+const { updateUserPatch, getOneUser } = useUsers();
+
+const {
+  loading: problemsLoading,
+  error: problemsError,
+  multProblems,
+  divProblems,
+  loadProblems,
+} = useProblems();
+
+const {
+  items,
+  loading: userProblemsLoading,
+  error: userProblemsError,
+  setUserId,
+  getOneUserProb,
+  fetchAllUP,
+  fetchUPByType,
+  updateUserProb,
+  seedUserProbs,
+} = useUserProblems();
 
 // Props
 const props = defineProps({
@@ -172,7 +195,7 @@ const lastDamage = ref(0);
 
 // Problem tracking
 const problemSet = computed(() => {
-  if (loading.value || error.value) return [];
+  if (userProblemsLoading.value || userProblemsError.value) return [];
   return kind.value === 'div'
     ? divProblems.value ?? []
     : multProblems.value ?? [];
@@ -291,6 +314,12 @@ const submitAnswer = async () => {
     await enemyAttack();
   }
 
+  await handleAnswerData(
+    currentProblem.value.id,
+    lastDurationSec.value,
+    isCorrect
+  );
+
   playerAnswer.value = '';
 
   // Check for battle end
@@ -351,6 +380,66 @@ const enemyAttack = async () => {
   await sleep(500);
 };
 
+const handleAnswerData = async (problemId, newTime, isCorrect) => {
+  const problem = await getOneUserProb(problemId);
+  const user = await getOneUser(Number(props.userId));
+  console.log('problem', problem);
+
+  await updateUserStats(user, problem.type, isCorrect);
+  await updateProblemStats(problem, newTime, isCorrect);
+};
+
+const updateUserStats = async (user, problemType, isCorrect) => {
+  const patch = {};
+
+  patch.totalProbsAttempted = user.totalProbsAttempted + 1;
+
+  if (isCorrect) {
+    patch.totalProbsCorrect = user.totalProbsCorrect + 1;
+    patch.streak = user.streak + 1;
+  } else {
+    patch.streak = 0;
+  }
+
+  switch (problemType) {
+    case 'multiplication':
+      patch.totalMultAttempted = user.totalMultAttempted + 1;
+      if (isCorrect) patch.totalMultCorrect = user.totalMultCorrect + 1;
+      break;
+    case 'division':
+      patch.totalDivAttempted = user.totalDivAttempted + 1;
+      if (isCorrect) patch.totalDivCorrect = user.totalDivCorrect + 1;
+      break;
+    default:
+      console.log('Unidentified problem type or operation');
+      throw new Error('Unidentified problem type or operation');
+  }
+
+  await updateUserPatch(user.id, patch);
+};
+
+const updateProblemStats = async (problem, newTime, isCorrect) => {
+  const patch = {};
+  let time = newTime;
+  if (!isCorrect) {
+    time = 20;
+  }
+  // Update times
+  patch.answerTimes = problem.answerTimes;
+  if (problem.answerTimes.length >= 10) {
+    patch.answerTimes = problem.answerTimes.shift();
+  }
+  patch.answerTimes.push(time);
+
+  // Recalculate average
+  patch.avgSec =
+    patch.answerTimes.reduce((a, b) => a + b) / problem.answerTimes.length;
+
+  // Update mastery status
+  patch.mastered = patch.avgSec < 5; // or whatever your threshold is
+  await updateUserProb(problem.problemId, patch);
+};
+
 const handleVictory = async () => {
   enemyDefeated.value = true;
   await sleep(1000);
@@ -390,6 +479,7 @@ const exitBattle = () => {
 };
 
 onMounted(async () => {
+  setUserId(Number(props.userId));
   await loadProblems();
   const len = battleProblems.value.length;
   if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);

@@ -59,6 +59,24 @@ export const userRepository = {
     });
   },
 
+  async patch(id, patch) {
+    const db = await getDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('users', 'readwrite');
+      const store = tx.objectStore('users');
+      const getReq = store.get(id);
+      console.log('patch', id, typeof id);
+      getReq.onsuccess = () => {
+        const cur = getReq.result;
+        if (!cur) return rej(new Error('User not found'));
+        store.put({ ...cur, ...patch });
+      };
+      getReq.onerror = () => rej(getReq.error);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  },
+
   async delete(id) {
     const db = await getDB();
     return new Promise((resolve, reject) => {

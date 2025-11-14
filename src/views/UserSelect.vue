@@ -144,10 +144,10 @@ const {
   loading: userProblemsLoading,
   error: userProblemsError,
   setUserId,
-  fetchAll,
-  fetchByType,
-  update,
-  seed,
+  fetchAllUP,
+  fetchUPByType,
+  updateUserProb,
+  seedUserProbs,
 } = useUserProblems();
 
 const username = ref('');
@@ -170,7 +170,10 @@ const handleAddUser = async () => {
     console.log('inside handleUser', newUserId);
     setUserId(newUserId);
 
-    await Promise.all([seed(multProblems.value), seed(divProblems.value)]);
+    await Promise.all([
+      seedUserProbs(multProblems.value),
+      seedUserProbs(divProblems.value),
+    ]);
   } catch (e) {
     userProblemsError.value = e.message;
     alert(e.message);
