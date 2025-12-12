@@ -23,11 +23,13 @@
       </div>
 
       <!-- Damage numbers -->
-      <transition name="damage-float">
-        <div v-if="showEnemyDamage" class="damage-number enemy-damage">
-          -{{ lastDamage }}
-        </div>
-      </transition>
+
+      <div
+        class="damage-number enemy-damage"
+        :class="{ 'damage-float-active': showEnemyDamage }"
+      >
+        -{{ lastDamage }}
+      </div>
     </div>
 
     <!-- Player Section -->
@@ -118,6 +120,18 @@ import {
   useUsers,
 } from '../composables/useDatabase';
 import { useRafTimer } from '@/composables/useRafTimer';
+import {
+  dmgPerCorrect,
+  reqAnswers,
+  xpPerCorrect,
+  xpToNext,
+  pickMonster,
+  tier,
+} from '@/services/game/progression';
+
+const userLevel = ref(1);
+const userXp = ref(0);
+const userXpToNext = ref(xpToNext(1));
 
 const router = useRouter();
 const route = useRoute();
@@ -172,6 +186,10 @@ watch(
     if (s === 'ready') nextTick(() => startBtn.value?.focus());
   }
 );
+
+const log = (event) => {
+  console.log('[damage-float]', event);
+};
 
 // Player stats
 const playerHp = ref(playerMaxHp.value);
@@ -298,6 +316,18 @@ function onAnswerEnter(e) {
   submitAnswer();
 }
 
+function initEncounter() {
+  const hp = reqAnswers(userLevel.value);
+  const m = pickMonster(userLevel.value);
+  currentEnemy.value = {
+    name: m.name,
+    sprite: currentEnemy.value.sprite, // keep placeholder
+    maxHp: hp,
+    damage: 6 + tier(userLevel.value), // simple enemy dmg scaling
+  };
+  enemyHp.value = currentEnemy.value.maxHp;
+}
+
 const submitAnswer = async () => {
   const parsed = parseInt(playerAnswer.value, 10);
   if (Number.isNaN(parsed)) return;
@@ -309,8 +339,11 @@ const submitAnswer = async () => {
   console.log('lastDurationSec:', lastDurationSec.value);
 
   if (isCorrect) {
+    battleState.value = 'message';
     await playerAttack();
+    grantXp(xpPerCorrect(userLevel.value));
   } else {
+    battleState.value = 'message';
     await enemyAttack();
   }
 
@@ -339,16 +372,25 @@ const submitAnswer = async () => {
 };
 
 const playerAttack = async () => {
-  battleState.value = 'message';
+  // battleState.value = 'message';
   battleMessage.value = `${playerName.value} attacks!`;
 
   // Attack animation
   playerAttacking.value = true;
   await sleep(500);
 
+  const damageKey = ref(0);
+
   // Damage enemy
-  const damage = Math.floor(Math.random() * 10) + 15; // 15-25 damage
+  damageKey.value++;
+  const base = dmgPerCorrect(userLevel.value); // 1..4
+  const rand = Math.random() < 0.1 ? 1 : 0; // small crit
+  const damage = base + rand;
+
+  console.log({ lvl: userLevel.value, base: dmgPerCorrect(userLevel.value) });
+  console.log('userXp:', userXp.value);
   lastDamage.value = damage;
+
   enemyHp.value = Math.max(0, enemyHp.value - damage);
   enemyTakingDamage.value = true;
   showEnemyDamage.value = true;
@@ -388,6 +430,32 @@ const handleAnswerData = async (problemId, newTime, isCorrect) => {
   await updateUserStats(user, problem.type, isCorrect);
   await updateProblemStats(problem, newTime, isCorrect);
 };
+
+// xp system helpers
+function grantXp(amount) {
+  let gained = amount;
+  while (gained > 0) {
+    const need = userXpToNext.value - userXp.value;
+    if (gained < need) {
+      userXp.value += gained;
+      gained = 0;
+    } else {
+      userXp.value += need;
+      gained -= need;
+      userLevel.value += 1;
+      userXp.value = 0;
+      userXpToNext.value = xpToNext(userLevel.value);
+      // optionally: toast level-up
+    }
+  }
+}
+
+async function persistUserProgress() {
+  await updateUserPatch(Number(props.userId), {
+    level: userLevel.value,
+    xp: userXp.value,
+  });
+}
 
 const updateUserStats = async (user, problemType, isCorrect) => {
   const patch = {};
@@ -442,10 +510,12 @@ const updateProblemStats = async (problem, newTime, isCorrect) => {
 
 const handleVictory = async () => {
   enemyDefeated.value = true;
+  grantXp(currentEnemy.value.maxHp); // kill bonus
+  await persistUserProgress();
   await sleep(1000);
   battleState.value = 'victory';
   emit('battleComplete', {
-    xp: xpGained.value,
+    xp: userXp.value,
     problemsAttempted: currentProblemCount.value + 1,
   });
 };
@@ -457,10 +527,12 @@ const handleDefeat = async () => {
 
 const nextBattle = () => {
   // Reset for next battle
-  enemyHp.value = currentEnemy.value.maxHp;
   enemyDefeated.value = false;
   playerHp.value = playerMaxHp.value;
   currentProblemIndex.value = getRandomInteger(0, battleProblems.value.length);
+
+  initEncounter();
+
   battleState.value = 'question';
   reset();
   nextTick(() => answerInput.value?.focus());
@@ -483,9 +555,17 @@ const exitBattle = () => {
 
 onMounted(async () => {
   setUserId(Number(props.userId));
+
+  const user = await getOneUser(Number(props.userId));
+  userLevel.value = user.level ?? 1;
+  userXp.value = user.xp ?? 0;
+  userXpToNext.value = xpToNext(userLevel.value);
+
   await loadProblems();
   const len = battleProblems.value.length;
   if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);
+
+  initEncounter();
   startBtn.value?.focus();
 });
 </script>
@@ -639,9 +719,10 @@ onMounted(async () => {
     -2px 2px 0 #000;
   pointer-events: none;
   z-index: 100;
+  opacity: 0; /* start hidden */
 }
 
-.damage-float-enter-active {
+.damage-float-active {
   animation: damageFloat 1s ease-out;
 }
 
