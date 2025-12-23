@@ -28,7 +28,7 @@
         class="damage-number enemy-damage"
         :class="{ 'damage-float-active': showEnemyDamage }"
       >
-        -{{ lastDamage }}
+        -{{ damage }}
       </div>
     </div>
 
@@ -121,16 +121,16 @@ import {
 } from '../composables/useDatabase';
 import { useRafTimer } from '@/composables/useRafTimer';
 import {
-  dmgPerCorrect,
-  reqAnswers,
+  calculateEnemyHp,
   xpPerCorrect,
+  levelFromTotalXp,
   xpToNext,
   pickMonster,
   tier,
+  rollDamage,
 } from '@/services/game/progression';
 
-const userLevel = ref(1);
-const userXp = ref(0);
+const userXpTotal = ref(0);
 const userXpToNext = ref(xpToNext(1));
 
 const router = useRouter();
@@ -197,6 +197,7 @@ const playerAnswer = ref('');
 const answerInput = ref(null);
 const playerAttacking = ref(false);
 const playerTakingDamage = ref(false);
+const xpGained = ref(0);
 
 // Enemy stats
 const currentEnemy = ref({
@@ -209,7 +210,7 @@ const enemyHp = ref(currentEnemy.value.maxHp);
 const enemyTakingDamage = ref(false);
 const enemyDefeated = ref(false);
 const showEnemyDamage = ref(false);
-const lastDamage = ref(0);
+const damage = ref(0);
 
 // Problem tracking
 const problemSet = computed(() => {
@@ -268,6 +269,11 @@ async function onTimerDone() {
 }
 
 // Computed
+const userLevel = computed(() => levelFromTotalXp(userXpTotal.value).level);
+const xpIntoLevel = computed(
+  () => levelFromTotalXp(userXpTotal.value).intoLevel
+);
+const xpNeeded = computed(() => levelFromTotalXp(userXpTotal.value).xpRequired);
 const playerHpPercent = computed(
   () => (playerHp.value / playerMaxHp.value) * 100
 );
@@ -277,7 +283,6 @@ const enemyHpPercent = computed(
 const playerSprite = computed(
   () => 'https://via.placeholder.com/150/4169E1/FFFFFF?text=Hero'
 ); // Placeholder
-const xpGained = computed(() => Math.floor(currentEnemy.value.maxHp / 2));
 
 // Helper functions
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -317,7 +322,7 @@ function onAnswerEnter(e) {
 }
 
 function initEncounter() {
-  const hp = reqAnswers(userLevel.value);
+  const hp = calculateEnemyHp(userLevel.value, 2);
   const m = pickMonster(userLevel.value);
   currentEnemy.value = {
     name: m.name,
@@ -379,19 +384,10 @@ const playerAttack = async () => {
   playerAttacking.value = true;
   await sleep(500);
 
-  const damageKey = ref(0);
-
   // Damage enemy
-  damageKey.value++;
-  const base = dmgPerCorrect(userLevel.value); // 1..4
-  const rand = Math.random() < 0.1 ? 1 : 0; // small crit
-  const damage = base + rand;
+  damage.value = rollDamage(userLevel.value);
 
-  console.log({ lvl: userLevel.value, base: dmgPerCorrect(userLevel.value) });
-  console.log('userXp:', userXp.value);
-  lastDamage.value = damage;
-
-  enemyHp.value = Math.max(0, enemyHp.value - damage);
+  enemyHp.value = Math.max(0, enemyHp.value - damage.value);
   enemyTakingDamage.value = true;
   showEnemyDamage.value = true;
 
@@ -433,27 +429,19 @@ const handleAnswerData = async (problemId, newTime, isCorrect) => {
 
 // xp system helpers
 function grantXp(amount) {
-  let gained = amount;
-  while (gained > 0) {
-    const need = userXpToNext.value - userXp.value;
-    if (gained < need) {
-      userXp.value += gained;
-      gained = 0;
-    } else {
-      userXp.value += need;
-      gained -= need;
-      userLevel.value += 1;
-      userXp.value = 0;
-      userXpToNext.value = xpToNext(userLevel.value);
-      // optionally: toast level-up
-    }
+  const beforeLevel = userLevel.value;
+  userXpTotal.value += amount;
+  xpGained.value += amount;
+  const afterLevel = userLevel.value;
+  if (afterLevel > beforeLevel) {
+    // optional: toast level-up
   }
 }
 
 async function persistUserProgress() {
   await updateUserPatch(Number(props.userId), {
     level: userLevel.value,
-    xp: userXp.value,
+    xp: userXpTotal.value,
   });
 }
 
@@ -515,7 +503,7 @@ const handleVictory = async () => {
   await sleep(1000);
   battleState.value = 'victory';
   emit('battleComplete', {
-    xp: userXp.value,
+    xp: userXpTotal.value,
     problemsAttempted: currentProblemCount.value + 1,
   });
 };
@@ -529,6 +517,7 @@ const nextBattle = () => {
   // Reset for next battle
   enemyDefeated.value = false;
   playerHp.value = playerMaxHp.value;
+  xpGained.value = 0;
   currentProblemIndex.value = getRandomInteger(0, battleProblems.value.length);
 
   initEncounter();
@@ -558,7 +547,7 @@ onMounted(async () => {
 
   const user = await getOneUser(Number(props.userId));
   userLevel.value = user.level ?? 1;
-  userXp.value = user.xp ?? 0;
+  userXpTotal.value = user.xp ?? 0;
   userXpToNext.value = xpToNext(userLevel.value);
 
   await loadProblems();
