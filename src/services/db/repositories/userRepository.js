@@ -65,7 +65,6 @@ export const userRepository = {
       const tx = db.transaction('users', 'readwrite');
       const store = tx.objectStore('users');
       const getReq = store.get(id);
-      console.log('patch', id, typeof id);
       getReq.onsuccess = () => {
         const cur = getReq.result;
         if (!cur) return rej(new Error('User not found'));

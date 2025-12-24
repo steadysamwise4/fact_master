@@ -29,9 +29,7 @@ export function useUsers() {
 
   const getOneUser = async (userId) => {
     try {
-      console.log('userId inside getOneUser', userId);
       const user = await userRepository.getById(userId);
-      console.log('inside getOneUser', user);
       return user;
     } catch (e) {
       error.value = e?.message ?? String(e);

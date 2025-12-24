@@ -39,18 +39,19 @@ export function xpToNext(level) {
 }
 
 export function levelFromTotalXp(totalXp) {
-  let lvl = 1;
+  let lvl = 1,
+    spent = 0;
   let needed = xpToNext(lvl);
-  let spent = 0;
 
   while (totalXp - spent >= needed) {
     spent += needed;
     lvl += 1;
     needed = xpToNext(lvl);
   }
-  // remaining XP toward next:
-  const intoLevel = totalXp - spent;
-  return { level: lvl, intoLevel, xpRequired: needed };
+  const intoLevel = totalXp - spent; // progress within current level
+  const xpRemaining = needed - intoLevel; // total left to next level
+
+  return { level: lvl, intoLevel, xpRequired: needed, xpRemaining };
 }
 
 export function pickMonster(level) {

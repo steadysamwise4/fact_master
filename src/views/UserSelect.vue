@@ -167,7 +167,6 @@ const handleAddUser = async () => {
   try {
     const newUserId = await addUser(constructUserData(username.value));
     username.value = '';
-    console.log('inside handleUser', newUserId);
     setUserId(newUserId);
 
     await Promise.all([

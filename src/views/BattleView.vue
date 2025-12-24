@@ -187,10 +187,6 @@ watch(
   }
 );
 
-const log = (event) => {
-  console.log('[damage-float]', event);
-};
-
 // Player stats
 const playerHp = ref(playerMaxHp.value);
 const playerAnswer = ref('');
@@ -198,6 +194,7 @@ const answerInput = ref(null);
 const playerAttacking = ref(false);
 const playerTakingDamage = ref(false);
 const xpGained = ref(0);
+const lastLevel = ref(1);
 
 // Enemy stats
 const currentEnemy = ref({
@@ -235,7 +232,6 @@ const battleProblems = computed(() => toBattleProblems(problemSet.value));
 const currentProblemCount = ref(0);
 const currentProblemIndex = ref(0);
 const currentProblem = computed(() => {
-  // console.log('battleProblems:', battleProblems.value);
   if (battleProblems.value.length === 0) {
     return { question: '5 × 7', answer: 35 };
   }
@@ -341,7 +337,6 @@ const submitAnswer = async () => {
 
   const isCorrect =
     parseInt(playerAnswer.value) === currentProblem.value.answer;
-  console.log('lastDurationSec:', lastDurationSec.value);
 
   if (isCorrect) {
     battleState.value = 'message';
@@ -421,7 +416,6 @@ const enemyAttack = async () => {
 const handleAnswerData = async (problemId, newTime, isCorrect) => {
   const problem = await getOneUserProb(problemId);
   const user = await getOneUser(Number(props.userId));
-  console.log('problem', problem);
 
   await updateUserStats(user, problem.type, isCorrect);
   await updateProblemStats(problem, newTime, isCorrect);
@@ -481,10 +475,11 @@ const updateProblemStats = async (problem, newTime, isCorrect) => {
     time = 20;
   }
   // Update times
-  patch.answerTimes = problem.answerTimes;
+
   if (problem.answerTimes.length >= 10) {
-    patch.answerTimes = problem.answerTimes.shift();
+    problem.answerTimes.shift();
   }
+  patch.answerTimes = problem.answerTimes;
   patch.answerTimes.push(time);
 
   // Recalculate average
@@ -500,6 +495,13 @@ const handleVictory = async () => {
   enemyDefeated.value = true;
   grantXp(currentEnemy.value.maxHp); // kill bonus
   await persistUserProgress();
+
+  console.log('userXpTotal:', userXpTotal.value);
+  const { level, xpRemaining } = levelFromTotalXp(userXpTotal.value);
+  console.log('xpRemaining:', xpRemaining);
+  console.log('level:', level);
+  maybeToastLevelUp(level);
+
   await sleep(1000);
   battleState.value = 'victory';
   emit('battleComplete', {
@@ -512,6 +514,26 @@ const handleDefeat = async () => {
   battleState.value = 'defeat';
   emit('battleFailed');
 };
+
+// Level Up Toast
+function maybeToastLevelUp(newLevel) {
+  if (newLevel > lastLevel.value) {
+    showToast(`Level Up! Now level ${newLevel}`);
+    lastLevel.value = newLevel;
+  }
+}
+
+function showToast(msg, ms = 3200) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250); // wait for fade-out
+  }, ms);
+}
 
 const nextBattle = () => {
   // Reset for next battle
@@ -861,6 +883,7 @@ onMounted(async () => {
 .answer-input::placeholder {
   color: #8b7355;
 }
+
 .timebar {
   position: relative;
   height: 20px;
