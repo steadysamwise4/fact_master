@@ -5,11 +5,13 @@
 
     <!-- Enemy Section -->
     <div class="enemy-section">
-      <div
-        class="enemy-sprite"
-        :class="{ shake: enemyTakingDamage, 'fade-out': enemyDefeated }"
-      >
-        <img :src="currentEnemy.sprite" :alt="currentEnemy.name" />
+      <div class="enemy-card">
+        <div
+          class="enemy-sprite"
+          :class="{ shake: enemyTakingDamage, 'fade-out': enemyDefeated }"
+        >
+          <img :src="currentEnemy.sprite" :alt="currentEnemy.name" />
+        </div>
       </div>
       <div class="enemy-info">
         <div class="enemy-name">{{ currentEnemy.name }}</div>
@@ -125,10 +127,10 @@ import {
   xpPerCorrect,
   levelFromTotalXp,
   xpToNext,
-  pickMonster,
   tier,
   rollDamage,
 } from '@/services/game/progression';
+import { pickMonster } from '../services/assets/monsters';
 
 const userXpTotal = ref(0);
 const userXpToNext = ref(xpToNext(1));
@@ -198,7 +200,7 @@ const lastLevel = ref(1);
 
 // Enemy stats
 const currentEnemy = ref({
-  name: 'Goblin',
+  name: 'Bat',
   sprite: 'https://via.placeholder.com/150/228B22/FFFFFF?text=Goblin', // Placeholder
   maxHp: 50,
   damage: 10,
@@ -322,7 +324,7 @@ function initEncounter() {
   const m = pickMonster(userLevel.value);
   currentEnemy.value = {
     name: m.name,
-    sprite: currentEnemy.value.sprite, // keep placeholder
+    sprite: m.sprite, // keep placeholder
     maxHp: hp,
     damage: 6 + tier(userLevel.value), // simple enemy dmg scaling
   };
@@ -619,17 +621,36 @@ onMounted(async () => {
 }
 
 .enemy-sprite {
-  width: 150px;
-  height: 150px;
-  margin-bottom: 20px;
+  width: 220px; /* was 150px */
+  height: 220px;
+  margin-bottom: 16px;
   position: relative;
+  image-rendering: pixelated;
 }
 
 .enemy-sprite img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+}
+
+.enemy-card {
+  background: rgba(0, 0, 0, 0.6);
+  border: 3px solid #8b6914;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 215, 0, 0.1);
+}
+
+/* optional decorative border */
+.enemy-card::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 215, 0, 0.25);
+  pointer-events: none;
 }
 
 .enemy-sprite.shake {

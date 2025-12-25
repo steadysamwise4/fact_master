@@ -53,20 +53,3 @@ export function levelFromTotalXp(totalXp) {
 
   return { level: lvl, intoLevel, xpRequired: needed, xpRemaining };
 }
-
-export function pickMonster(level) {
-  const pools = [
-    ['Slime', 'Bat', 'Rat'],
-    ['Goblin', 'Imp', 'Wolf'],
-    ['Skeleton', 'Bandit', 'Spider'],
-    ['Orc', 'Wraith', 'Harpy'],
-    ['Troll', 'Golem', 'Mage'],
-    ['Wyvern', 'Warlock', 'Assassin'],
-    ['Lich', 'Hydra', 'Dragonling'],
-    ['Behemoth', 'Phoenix', 'Elder Dragon'],
-    ['Ancient Titan', 'Void Serpent', 'Star Drake'],
-  ];
-  const idx = Math.min(pools.length, tier(level)) - 1;
-  const name = pools[idx][Math.floor(Math.random() * pools[idx].length)];
-  return { name };
-}
