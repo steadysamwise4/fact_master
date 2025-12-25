@@ -36,11 +36,13 @@
 
     <!-- Player Section -->
     <div class="player-section">
-      <div
-        class="player-sprite"
-        :class="{ attack: playerAttacking, hurt: playerTakingDamage }"
-      >
-        <img :src="playerSprite" alt="Hero" />
+      <div class="hero-card">
+        <div
+          class="player-sprite"
+          :class="{ attack: playerAttacking, hurt: playerTakingDamage }"
+        >
+          <img :src="playerSprite" alt="Hero" />
+        </div>
       </div>
       <div class="player-info">
         <div class="player-name">{{ playerName }}</div>
@@ -131,6 +133,7 @@ import {
   rollDamage,
 } from '@/services/game/progression';
 import { pickMonster } from '../services/assets/monsters';
+import { playerSprites } from '../services/assets/heroes';
 
 const userXpTotal = ref(0);
 const userXpToNext = ref(xpToNext(1));
@@ -278,9 +281,7 @@ const playerHpPercent = computed(
 const enemyHpPercent = computed(
   () => (enemyHp.value / currentEnemy.value.maxHp) * 100
 );
-const playerSprite = computed(
-  () => 'https://via.placeholder.com/150/4169E1/FFFFFF?text=Hero'
-); // Placeholder
+const playerSprite = computed(() => playerSprites['Knight']); // Placeholder
 
 // Helper functions
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -774,32 +775,43 @@ onMounted(async () => {
 }
 
 /* Player Section */
-.player-section {
-  position: relative;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
 .player-sprite {
-  width: 120px;
-  height: 120px;
-  margin-bottom: 15px;
+  width: 200px; /* was 120px */
+  height: 200px;
+  margin-bottom: 14px;
+  position: relative;
+  image-rendering: pixelated;
 }
 
 .player-sprite img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
 }
 
+.hero-card {
+  position: relative;
+  background: rgba(0, 0, 0, 0.6);
+  border: 3px solid #4067b8; /* blue-gold pair for hero */
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.12);
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 14px;
+  border: 2px solid rgba(96, 165, 250, 0.25);
+  pointer-events: none;
+}
+
+/* keep your attack/hurt keyframes; this just scales better sprites */
 .player-sprite.attack {
   animation: attackLunge 0.5s;
 }
-
 .player-sprite.hurt {
   animation: hurt 0.5s;
 }
