@@ -3,110 +3,120 @@
     <!-- Background -->
     <div class="battle-background"></div>
 
-    <!-- Enemy Section -->
-    <div class="enemy-section">
-      <div class="enemy-card">
-        <div
-          class="enemy-sprite"
-          :class="{ shake: enemyTakingDamage, 'fade-out': enemyDefeated }"
-        >
-          <img :src="currentEnemy.sprite" :alt="currentEnemy.name" />
-        </div>
-      </div>
-      <div class="enemy-info">
-        <div class="enemy-name">{{ currentEnemy.name }}</div>
-        <div class="hp-bar">
+    <div class="battlefield">
+      <div class="side enemy-side">
+        <!-- Enemy Section -->
+        <div class="enemy-section">
+          <div class="enemy-card">
+            <div
+              class="enemy-sprite"
+              :class="{ shake: enemyTakingDamage, 'fade-out': enemyDefeated }"
+            >
+              <img :src="currentEnemy.sprite" :alt="currentEnemy.name" />
+            </div>
+          </div>
+          <div class="enemy-info">
+            <div class="enemy-name">{{ currentEnemy.name }}</div>
+            <div class="hp-bar">
+              <div
+                class="hp-fill enemy-hp"
+                :style="{ width: enemyHpPercent + '%' }"
+              ></div>
+            </div>
+            <div class="hp-text">
+              HP: {{ enemyHp }} / {{ currentEnemy.maxHp }}
+            </div>
+          </div>
+
+          <!-- Damage numbers -->
+
           <div
-            class="hp-fill enemy-hp"
-            :style="{ width: enemyHpPercent + '%' }"
-          ></div>
-        </div>
-        <div class="hp-text">HP: {{ enemyHp }} / {{ currentEnemy.maxHp }}</div>
-      </div>
-
-      <!-- Damage numbers -->
-
-      <div
-        class="damage-number enemy-damage"
-        :class="{ 'damage-float-active': showEnemyDamage }"
-      >
-        -{{ damage }}
-      </div>
-    </div>
-
-    <!-- Player Section -->
-    <div class="player-section">
-      <div class="hero-card">
-        <div
-          class="player-sprite"
-          :class="{ attack: playerAttacking, hurt: playerTakingDamage }"
-        >
-          <img :src="playerSprite" alt="Hero" />
+            class="damage-number enemy-damage"
+            :class="{ 'damage-float-active': showEnemyDamage }"
+          >
+            -{{ damage }}
+          </div>
         </div>
       </div>
-      <div class="player-info">
-        <div class="player-name">{{ playerName }}</div>
-        <div class="hp-bar">
-          <div
-            class="hp-fill player-hp"
-            :style="{ width: playerHpPercent + '%' }"
-          ></div>
+
+      <div class="center-ui">
+        <!-- Battle UI -->
+        <div v-if="battleState === 'ready'">
+          <form @submit.prevent="beginBattle">
+            <button type="submit" class="btn btn-action" ref="startBtn">
+              Start Battle
+            </button>
+          </form>
         </div>
-        <div class="hp-text">HP: {{ playerHp }} / {{ playerMaxHp }}</div>
-      </div>
-    </div>
+        <div v-else class="battle-ui">
+          <!-- Problem Display -->
+          <div v-show="battleState === 'question'" class="problem-box">
+            <div class="problem-text">{{ currentProblem.question }}</div>
+            <input
+              ref="answerInput"
+              v-model="playerAnswer"
+              type="number"
+              class="answer-input"
+              @keydown.enter.prevent="onAnswerEnter"
+              placeholder="Your answer"
+            />
+            <div class="timebar">
+              <div
+                class="timebar-empty"
+                :style="{ width: 100 - progress * 100 + '%' }"
+              ></div>
+              <div class="timebar-seg s1"></div>
+              <div class="timebar-seg s2"></div>
+              <div class="timebar-seg s3"></div>
+              <div class="timebar-seg s4"></div>
+              <div class="timebar-seg s5"></div>
+            </div>
+            <button @click="submitAnswer" class="submit-btn">Attack!</button>
+          </div>
 
-    <!-- Battle UI -->
-    <div v-if="battleState === 'ready'">
-      <form @submit.prevent="beginBattle">
-        <button type="submit" class="btn btn-action" ref="startBtn">
-          Start Battle
-        </button>
-      </form>
-    </div>
-    <div v-else class="battle-ui">
-      <!-- Problem Display -->
-      <div v-if="battleState === 'question'" class="problem-box">
-        <div class="problem-text">{{ currentProblem.question }}</div>
-        <input
-          ref="answerInput"
-          v-model="playerAnswer"
-          type="number"
-          class="answer-input"
-          @keydown.enter.prevent="onAnswerEnter"
-          placeholder="Your answer"
-        />
-        <div class="timebar">
-          <div
-            class="timebar-empty"
-            :style="{ width: 100 - progress * 100 + '%' }"
-          ></div>
-          <div class="timebar-seg s1"></div>
-          <div class="timebar-seg s2"></div>
-          <div class="timebar-seg s3"></div>
-          <div class="timebar-seg s4"></div>
-          <div class="timebar-seg s5"></div>
+          <!-- Battle Messages -->
+          <div v-show="battleState === 'message'" class="message-box">
+            <div class="message-text">{{ battleMessage }}</div>
+          </div>
+
+          <!-- Victory/Defeat -->
+          <div v-show="battleState === 'victory'" class="result-box victory">
+            <h2>Victory!</h2>
+            <p>You defeated {{ currentEnemy.name }}!</p>
+            <p>XP Gained: {{ xpGained }}</p>
+            <button @click="nextBattle" class="result-btn">Next Battle</button>
+          </div>
+
+          <div v-show="battleState === 'defeat'" class="result-box defeat">
+            <h2>Defeated...</h2>
+            <p>{{ currentEnemy.name }} was too strong!</p>
+            <button @click="retry" class="result-btn">Try Again</button>
+          </div>
         </div>
-        <button @click="submitAnswer" class="submit-btn">Attack!</button>
       </div>
 
-      <!-- Battle Messages -->
-      <div v-if="battleState === 'message'" class="message-box">
-        <div class="message-text">{{ battleMessage }}</div>
-      </div>
-
-      <!-- Victory/Defeat -->
-      <div v-if="battleState === 'victory'" class="result-box victory">
-        <h2>Victory!</h2>
-        <p>You defeated {{ currentEnemy.name }}!</p>
-        <p>XP Gained: {{ xpGained }}</p>
-        <button @click="nextBattle" class="result-btn">Next Battle</button>
-      </div>
-
-      <div v-if="battleState === 'defeat'" class="result-box defeat">
-        <h2>Defeated...</h2>
-        <p>{{ currentEnemy.name }} was too strong!</p>
-        <button @click="retry" class="result-btn">Try Again</button>
+      <div class="side hero-side">
+        <!-- Player Section -->
+        <div class="player-section">
+          <div class="hero-card">
+            <div
+              class="player-sprite"
+              :class="{ attack: playerAttacking, hurt: playerTakingDamage }"
+            >
+              <img :src="playerSprite" alt="Hero" />
+            </div>
+          </div>
+          <div class="player-info">
+            <div class="player-name">{{ playerName }}</div>
+            <div class="hp-bar">
+              <div
+                class="hp-fill player-hp"
+                :style="{ width: playerHpPercent + '%' }"
+              ></div>
+            </div>
+            <div class="hp-text">HP: {{ playerHp }} / {{ playerMaxHp }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -611,7 +621,28 @@ onMounted(async () => {
   pointer-events: none;
 }
 
+.battlefield {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr minmax(420px, 640px) 1fr; /* enemy | center | hero */
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px; /* minimal edge padding */
+  width: 100%;
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Enemy Section */
+.enemy-side {
+  align-items: flex-start;
+  justify-self: start;
+}
+
 .enemy-section {
   position: relative;
   padding: 60px 20px 40px;
@@ -691,6 +722,7 @@ onMounted(async () => {
   border: 2px solid #8b6914;
   border-radius: 8px;
   padding: 15px 25px;
+  max-width: 320px;
   min-width: 250px;
 }
 
@@ -775,6 +807,11 @@ onMounted(async () => {
 }
 
 /* Player Section */
+.hero-side {
+  align-items: flex-end;
+  justify-self: end;
+}
+
 .player-sprite {
   width: 200px; /* was 120px */
   height: 200px;
@@ -849,6 +886,7 @@ onMounted(async () => {
   border: 2px solid #8b6914;
   border-radius: 8px;
   padding: 15px 25px;
+  max-width: 320px;
   min-width: 250px;
 }
 
@@ -862,9 +900,26 @@ onMounted(async () => {
 }
 
 /* Battle UI */
-.battle-ui {
+.bottom-center {
   margin-top: auto;
+  display: flex;
+  justify-content: center;
+  padding: 16px 24px 32px;
+}
+.problem-box {
+  width: 100%;
+  max-width: 720px;
   padding: 20px;
+} /* center wide */
+
+.battle-ui {
+  position: relative;
+  height: 220px; /* fixed space */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* start from top of this area */
+  padding-bottom: 16px;
+  margin-top: auto;
   background: linear-gradient(
     to bottom,
     transparent 0%,
@@ -878,9 +933,10 @@ onMounted(async () => {
   background: rgba(44, 24, 16, 0.95);
   border: 3px solid #8b6914;
   border-radius: 8px;
-  padding: 30px;
-  max-width: 600px;
-  margin: 0 auto;
+  padding: 20px;
+  max-width: 640px;
+  margin: 0;
+  width: 100%;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
@@ -1061,8 +1117,8 @@ onMounted(async () => {
 
 .exit-btn {
   position: fixed;
-  top: 20px;
-  left: 20px;
+  top: 16px;
+  left: 16px;
   padding: 10px 20px;
   background: rgba(0, 0, 0, 0.7);
   border: 2px solid #8b6914;
@@ -1072,7 +1128,7 @@ onMounted(async () => {
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'Georgia', serif;
-  z-index: 1000;
+  z-index: 10000;
 }
 
 .exit-btn:hover {
@@ -1104,5 +1160,22 @@ onMounted(async () => {
   .result-box h2 {
     font-size: 2rem;
   }
+}
+
+@media (max-width: 900px) {
+  .battlefield {
+    grid-template-columns: 1fr; /* stack on small screens */
+    grid-auto-rows: auto;
+    gap: 12px;
+    padding: 8px;
+  }
+  .enemy-side,
+  .hero-side {
+    justify-self: center;
+    align-items: center;
+  }
+  .center-ui {
+    order: 2;
+  } /* keep Q/A in middle of stacked layout */
 }
 </style>
