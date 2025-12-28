@@ -6,7 +6,7 @@
     <div class="battlefield">
       <div class="side enemy-side">
         <!-- Enemy Section -->
-        <div class="enemy-section">
+        <div class="section enemy-section">
           <div class="enemy-card">
             <div
               class="enemy-sprite"
@@ -40,10 +40,18 @@
       </div>
 
       <div class="center-ui">
+        <!-- Hint box -->
+        <div
+          v-show="showHint"
+          class="hint-text floating"
+          :class="{ flash: hintFlash }"
+        >
+          {{ hintText }}
+        </div>
         <!-- Battle UI -->
-        <div v-if="battleState === 'ready'">
-          <form @submit.prevent="beginBattle">
-            <button type="submit" class="btn btn-action" ref="startBtn">
+        <div v-if="battleState === 'ready'" class="center-ui">
+          <form @submit.prevent="beginBattle" style="width: 100%">
+            <button type="submit" class="btn start-btn" ref="startBtn">
               Start Battle
             </button>
           </form>
@@ -97,7 +105,7 @@
 
       <div class="side hero-side">
         <!-- Player Section -->
-        <div class="player-section">
+        <div class="section player-section">
           <div class="hero-card">
             <div
               class="player-sprite"
@@ -126,7 +134,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import {
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  watch,
+  onBeforeUnmount,
+} from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   useProblems,
@@ -258,6 +273,13 @@ const currentProblem = computed(() => {
   );
 });
 
+// Hint box
+const showHint = computed(
+  () => progress.value <= 0.4 && battleState.value === 'question'
+);
+const hintFlash = ref(false);
+let hintInterval;
+
 // Timer
 const { progress, running, lastDurationSec, start, stop, reset } = useRafTimer(
   20000,
@@ -292,6 +314,12 @@ const enemyHpPercent = computed(
   () => (enemyHp.value / currentEnemy.value.maxHp) * 100
 );
 const playerSprite = computed(() => playerSprites['Knight']); // Placeholder
+const hintText = computed(() => {
+  const p = currentProblem.value;
+  console.log('currentProblem:', currentProblem.value);
+  if (!p.question) return '';
+  return p.answer;
+});
 
 // Helper functions
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -301,6 +329,18 @@ function getRandomInteger(min, max) {
   max = Math.floor(max); // Ensures max is an integer
   return Math.floor(Math.random() * (max - min)) + min;
 }
+
+watch(showHint, (v) => {
+  clearInterval(hintInterval);
+  if (v) {
+    hintFlash.value = true;
+    hintInterval = setInterval(() => {
+      hintFlash.value = !hintFlash.value;
+    }, 500);
+  } else {
+    hintFlash.value = false;
+  }
+});
 
 // Methods
 let starting = false;
@@ -592,6 +632,8 @@ onMounted(async () => {
   initEncounter();
   startBtn.value?.focus();
 });
+
+onBeforeUnmount(() => clearInterval(hintInterval));
 </script>
 
 <style scoped>
@@ -624,7 +666,7 @@ onMounted(async () => {
 .battlefield {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr minmax(420px, 640px) 1fr; /* enemy | center | hero */
+  grid-template-columns: 1fr minmax(520px, 640px) 1fr; /* enemy | center | hero */
   align-items: center;
   gap: 16px;
   padding: 0 8px; /* minimal edge padding */
@@ -639,20 +681,26 @@ onMounted(async () => {
 
 /* Enemy Section */
 .enemy-side {
-  align-items: flex-start;
+  align-items: center;
   justify-self: start;
 }
 
-.enemy-section {
+.section {
   position: relative;
-  padding: 60px 20px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 300px;
+  padding: 20px 20px 16px;
+  border: 1px solid #8b6914;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  z-index: 1;
 }
 
-.enemy-sprite {
+.enemy-section {
+  border-color: #8b6914;
+}
+
+.enemy-sprite,
+.player-sprite {
   width: 220px; /* was 150px */
   height: 220px;
   margin-bottom: 16px;
@@ -680,8 +728,8 @@ onMounted(async () => {
   content: '';
   position: absolute;
   inset: -6px;
-  border-radius: 14px;
-  border: 2px solid rgba(255, 215, 0, 0.25);
+  /* border-radius: 14px; */
+  /* border: 2px solid rgba(255, 215, 0, 0.25); */
   pointer-events: none;
 }
 
@@ -808,22 +856,18 @@ onMounted(async () => {
 
 /* Player Section */
 .hero-side {
-  align-items: flex-end;
+  align-items: center;
   justify-self: end;
-}
-
-.player-sprite {
-  width: 200px; /* was 120px */
-  height: 200px;
-  margin-bottom: 14px;
-  position: relative;
-  image-rendering: pixelated;
 }
 
 .player-sprite img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.player-section {
+  border-color: #4067b8;
 }
 
 .hero-card {
@@ -840,8 +884,8 @@ onMounted(async () => {
   content: '';
   position: absolute;
   inset: -6px;
-  border-radius: 14px;
-  border: 2px solid rgba(96, 165, 250, 0.25);
+  /* border-radius: 14px;
+  border: 2px solid rgba(96, 165, 250, 0.25); */
   pointer-events: none;
 }
 
@@ -900,6 +944,14 @@ onMounted(async () => {
 }
 
 /* Battle UI */
+.center-ui {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
 .bottom-center {
   margin-top: auto;
   display: flex;
@@ -1023,6 +1075,13 @@ onMounted(async () => {
   display: none;
 }
 
+.start-btn {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  font-size: 1.3rem;
+}
+
 .submit-btn {
   width: 100%;
   padding: 15px;
@@ -1113,6 +1172,38 @@ onMounted(async () => {
 .result-btn:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #5a4208, 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+.hint-text {
+  max-width: 520px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  color: #ffeaa7; /* text only */
+  margin-bottom: 96px; /* ~1.25–2 inches depending on DPI; adjust 80–130px */
+  padding: 0; /* no border/background */
+  font-size: 2rem;
+}
+
+.hint-text.floating {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.hint-text.flash {
+  animation: hintBlink 0.8s infinite;
+}
+@keyframes hintBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .exit-btn {
