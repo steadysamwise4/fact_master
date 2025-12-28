@@ -6,6 +6,9 @@ import rat from '@/assets/images/enemies/rat.png';
 import goblin from '@/assets/images/enemies/goblin.png';
 import wolf from '@/assets/images/enemies/wolf.png';
 import imp from '@/assets/images/enemies/imp.png';
+import skeleton from '@/assets/images/enemies/skeleton.png';
+import bandit from '@/assets/images/enemies/bandit.png';
+import spider from '@/assets/images/enemies/spider.png';
 
 export const monsterSprites = {
   Slime: slime,
@@ -14,6 +17,9 @@ export const monsterSprites = {
   Goblin: goblin,
   Imp: imp,
   Wolf: wolf,
+  Skeleton: skeleton,
+  Bandit: bandit,
+  Spider: spider,
 };
 
 export function pickMonster(level) {
