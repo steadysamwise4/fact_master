@@ -1,6 +1,6 @@
 import { seedProblemsIfEmpty } from './seed';
 
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbInstance = null;
 

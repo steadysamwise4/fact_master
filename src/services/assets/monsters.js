@@ -1,4 +1,4 @@
-import { tier } from '../game/progression';
+import { tierFromMastery } from '@/services/game/tiers';
 
 import slime from '@/assets/images/enemies/slime.png';
 import bat from '@/assets/images/enemies/bat.png';
@@ -9,6 +9,23 @@ import imp from '@/assets/images/enemies/imp.png';
 import skeleton from '@/assets/images/enemies/skeleton.png';
 import bandit from '@/assets/images/enemies/bandit.png';
 import spider from '@/assets/images/enemies/spider.png';
+
+export const monsterPools = {
+  mult: [
+    ['Slime', 'Bat', 'Rat'], // tier 1
+    ['Lich', 'Hydra', 'Dragonling'], // tier 2
+    ['Skeleton', 'Bandit', 'Spider'], // tier 3
+    ['Troll', 'Golem', 'Mage'], // tier 4
+    ['Ancient Titan', 'Void Serpent', 'Elder Dragon'], // tier 5
+  ],
+  div: [
+    ['Goblin', 'Imp', 'Wolf'], // tier 1
+    ['Orc', 'Wraith', 'Harpy'], // tier 2
+    ['Wyvern', 'Warlock', 'Assassin'], // tier 3
+    ['Behemoth', 'Phoenix', 'Star Drake'], // tier 4
+    ['Reaper', 'Skull Bearer', 'Were Beast'], // tier 5
+  ],
+};
 
 export const monsterSprites = {
   Slime: slime,
@@ -22,21 +39,11 @@ export const monsterSprites = {
   Spider: spider,
 };
 
-export function pickMonster(level) {
-  const pools = [
-    ['Slime', 'Bat', 'Rat'],
-    ['Goblin', 'Imp', 'Wolf'],
-    ['Skeleton', 'Bandit', 'Spider'],
-    ['Orc', 'Wraith', 'Harpy'],
-    ['Troll', 'Golem', 'Mage'],
-    ['Wyvern', 'Warlock', 'Assassin'],
-    ['Lich', 'Hydra', 'Dragonling'],
-    ['Behemoth', 'Phoenix', 'Elder Dragon'],
-    ['Ancient Titan', 'Void Serpent', 'Star Drake'],
-  ];
-  const idx = Math.min(pools.length, tier(level)) - 1;
-  const name = pools[idx][Math.floor(Math.random() * pools[idx].length)];
-  const sprite = monsterSprites[name] ?? monsterSprites['Bat'];
-  console.log('sprite:', sprite);
-  return { name, key: name.toLocaleLowerCase(), sprite };
+export function pickMonsterByOp(op, mastered, total) {
+  const pools = monsterPools[op] || monsterPools.mult;
+  const t = Math.max(1, Math.min(5, tierFromMastery(mastered, total)));
+  const tierIdx = t - 1;
+  const names = pools[tierIdx] || pools[0];
+  const name = names[Math.floor(Math.random() * names.length)];
+  return { name, key: name, sprite: monsterSprites[name], tier: t };
 }

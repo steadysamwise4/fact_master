@@ -131,6 +131,7 @@ import {
 const router = useRouter();
 
 const { addUser, users, removeUser } = useUsers();
+console.log('users:', users);
 const {
   loading: problemsLoading,
   error: problemsError,
@@ -233,8 +234,10 @@ const constructUserData = (name) => {
     totalProbsCorrect: 0,
     totalMultAttempted: 0,
     totalMultCorrect: 0,
+    totalMultMastered: 0,
     totalDivAttempted: 0,
     totalDivCorrect: 0,
+    totalDivMastered: 0,
     streak: 0,
   };
 };

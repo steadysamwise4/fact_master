@@ -22,7 +22,7 @@ export const userProblemRepository = {
           userId,
           problemId: p.id,
           type: p.operation,
-          answerTimes: [20, 20, 20, 20, 20],
+          answerTimes: [6, 6, 6, 6, 6],
           answerTimeAvg: 20,
           mastered: false,
         });

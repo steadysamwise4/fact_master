@@ -1,4 +1,28 @@
 import { getDB } from '../index.js';
+import { PROBLEM_TOTALS } from '../../../config/problems.js';
+
+function normalizeUser(u) {
+  if (!u) return u;
+  return {
+    ...u,
+    totalMultMastered: Number.isFinite(u.totalMultMastered)
+      ? u.totalMultMastered
+      : 0,
+    totalDivMastered: Number.isFinite(u.totalDivMastered)
+      ? u.totalDivMastered
+      : 0,
+  };
+}
+
+function clampMasteryPatch(user, patch) {
+  const mult = patch.totalMultMastered ?? user.totalMultMastered ?? 0;
+  const div = patch.totalDivMastered ?? user.totalDivMastered ?? 0;
+  return {
+    ...patch,
+    totalMultMastered: Math.max(0, Math.min(mult, PROBLEM_TOTALS.mult)),
+    totalDivMastered: Math.max(0, Math.min(div, PROBLEM_TOTALS.div)),
+  };
+}
 
 export const userRepository = {
   async getAll() {
@@ -8,7 +32,8 @@ export const userRepository = {
       const store = transaction.objectStore('users');
       const request = store.getAll();
 
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () =>
+        resolve((request.result || []).map(normalizeUser));
       request.onerror = () => reject(request.error);
     });
   },
@@ -19,7 +44,7 @@ export const userRepository = {
       const transaction = db.transaction(['users'], 'readonly');
       const request = transaction.objectStore('users').get(id);
 
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => resolve(normalizeUser(request.result));
       request.onerror = () => reject(request.error);
     });
   },
@@ -38,7 +63,8 @@ export const userRepository = {
           return;
         }
 
-        const addRequest = store.add(user);
+        const newUser = normalizeUser(user);
+        const addRequest = store.add(newUser);
 
         addRequest.onsuccess = () => resolve(addRequest.result);
         addRequest.onerror = () => reject(addRequest.error);
@@ -52,25 +78,40 @@ export const userRepository = {
     const db = await getDB();
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(['users'], 'readwrite');
-      const request = transaction.objectStore('users').put(user);
+      const store = transaction.objectStore('users');
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      // Read current to clamp safely
+      const getReq = store.get(user.id);
+      getReq.onsuccess = () => {
+        const cur = normalizeUser(getReq.result);
+        if (!cur) return reject(new Error('User not found'));
+
+        const merged = { ...cur, ...user };
+        const clamped = clampMasteryPatch(cur, merged);
+
+        const putReq = store.put(clamped);
+        putReq.onsuccess = () => resolve(putReq.result);
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
     });
   },
-
   async patch(id, patch) {
     const db = await getDB();
     return new Promise((res, rej) => {
       const tx = db.transaction('users', 'readwrite');
       const store = tx.objectStore('users');
       const getReq = store.get(id);
+
       getReq.onsuccess = () => {
-        const cur = getReq.result;
+        const cur = normalizeUser(getReq.result);
         if (!cur) return rej(new Error('User not found'));
-        store.put({ ...cur, ...patch });
+
+        const clamped = clampMasteryPatch(cur, patch);
+        store.put({ ...cur, ...clamped });
       };
       getReq.onerror = () => rej(getReq.error);
+
       tx.oncomplete = () => res();
       tx.onerror = () => rej(tx.error);
     });

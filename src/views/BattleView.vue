@@ -154,11 +154,13 @@ import {
   xpPerCorrect,
   levelFromTotalXp,
   xpToNext,
-  tier,
   rollDamage,
+  tier,
 } from '@/services/game/progression';
-import { pickMonster } from '../services/assets/monsters';
+import { pickMonsterByOp } from '../services/assets/monsters';
 import { playerSprites } from '../services/assets/heroes';
+import { backfillMasteryForUser } from '../services/users/backfill';
+import { PROBLEM_TOTALS } from '../config/problems';
 
 const userXpTotal = ref(0);
 const userXpToNext = ref(xpToNext(1));
@@ -218,6 +220,7 @@ watch(
 );
 
 // Player stats
+const currentUser = ref(null);
 const playerHp = ref(playerMaxHp.value);
 const playerAnswer = ref('');
 const answerInput = ref(null);
@@ -225,6 +228,10 @@ const playerAttacking = ref(false);
 const playerTakingDamage = ref(false);
 const xpGained = ref(0);
 const lastLevel = ref(1);
+
+// get mastery counts (from your user or aggregated repos)
+const masteredMult = ref(0);
+const masteredDiv = ref(0);
 
 // Enemy stats
 const currentEnemy = ref({
@@ -322,6 +329,12 @@ const hintText = computed(() => {
 });
 
 // Helper functions
+function getOpCounts() {
+  return kind.value === 'div'
+    ? { mastered: masteredDiv.value, total: PROBLEM_TOTALS.div }
+    : { mastered: masteredMult.value, total: PROBLEM_TOTALS.mult };
+}
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function getRandomInteger(min, max) {
@@ -372,7 +385,8 @@ function onAnswerEnter(e) {
 
 function initEncounter() {
   const hp = calculateEnemyHp(userLevel.value, 2);
-  const m = pickMonster(userLevel.value);
+  const { mastered, total } = getOpCounts();
+  const m = pickMonsterByOp(kind.value, mastered, total);
   currentEnemy.value = {
     name: m.name,
     sprite: m.sprite, // keep placeholder
@@ -522,26 +536,65 @@ const updateUserStats = async (user, problemType, isCorrect) => {
 };
 
 const updateProblemStats = async (problem, newTime, isCorrect) => {
-  const patch = {};
-  let time = newTime;
-  if (!isCorrect) {
-    time = 20;
+  const time = isCorrect ? newTime : 20;
+
+  // Keep last 10 times (clone before mutate)
+  const times = Array.isArray(problem.answerTimes)
+    ? [...problem.answerTimes]
+    : [];
+  if (times.length >= 5) times.shift();
+  times.push(time);
+
+  const sum = times.reduce((a, b) => a + b, 0);
+  const avg = times.length ? sum / times.length : time;
+
+  const wasMastered = !!problem.mastered;
+  const nowMastered = avg < 5; // your threshold
+
+  const probPatch = {
+    answerTimes: times,
+    avgSec: avg,
+    mastered: nowMastered,
+  };
+  await updateUserProb(problem.problemId, probPatch);
+
+  // Determine kind from problem.type ('multiplication' | 'division')
+  const problemType = problem.type;
+  if (problemType !== 'multiplication' && problemType !== 'division') return;
+
+  // Only update counters on state change
+  if (wasMastered === nowMastered) return;
+
+  const user = await getOneUser(Number(props.userId));
+  const userPatch = {};
+
+  if (problemType === 'multiplication') {
+    if (nowMastered && !wasMastered) {
+      masteredMult.value = (masteredMult.value ?? 0) + 1;
+      userPatch.totalMultMastered = (user.totalMultMastered ?? 0) + 1;
+    } else if (!nowMastered && wasMastered) {
+      masteredMult.value = Math.max(0, (masteredMult.value ?? 0) - 1);
+      userPatch.totalMultMastered = Math.max(
+        0,
+        (user.totalMultMastered ?? 0) - 1
+      );
+    }
+  } else {
+    if (nowMastered && !wasMastered) {
+      masteredDiv.value = (masteredDiv.value ?? 0) + 1;
+      userPatch.totalDivMastered = (user.totalDivMastered ?? 0) + 1;
+    } else if (!nowMastered && wasMastered) {
+      masteredDiv.value = Math.max(0, (masteredDiv.value ?? 0) - 1);
+      userPatch.totalDivMastered = Math.max(
+        0,
+        (user.totalDivMastered ?? 0) - 1
+      );
+    }
   }
-  // Update times
 
-  if (problem.answerTimes.length >= 10) {
-    problem.answerTimes.shift();
+  if (Object.keys(userPatch).length) {
+    await updateUserPatch(user.id, userPatch);
   }
-  patch.answerTimes = problem.answerTimes;
-  patch.answerTimes.push(time);
-
-  // Recalculate average
-  patch.avgSec =
-    patch.answerTimes.reduce((a, b) => a + b) / problem.answerTimes.length;
-
-  // Update mastery status
-  patch.mastered = patch.avgSec < 5; // or whatever your threshold is
-  await updateUserProb(problem.problemId, patch);
 };
 
 const handleVictory = async () => {
@@ -618,18 +671,31 @@ const exitBattle = () => {
 };
 
 onMounted(async () => {
-  setUserId(Number(props.userId));
+  const uid = Number(props.userId);
+  setUserId(uid);
 
-  const user = await getOneUser(Number(props.userId));
+  // fire-and-forget backfill (so tiers stay accurate)
+  await backfillMasteryForUser(uid).catch((err) =>
+    console.warn('backfill error', err)
+  );
+
+  const user = await getOneUser(uid);
+  if (!user) throw new Error(`User ${uid} not found`);
+  currentUser.value = user;
+  console.log('currentUser.value', currentUser.value);
   userLevel.value = user.level ?? 1;
   userXpTotal.value = user.xp ?? 0;
   userXpToNext.value = xpToNext(userLevel.value);
+
+  // init mastery counters safely
+  masteredMult.value = user.totalMultMastered ?? 0;
+  masteredDiv.value = user.totalDivMastered ?? 0;
 
   await loadProblems();
   const len = battleProblems.value.length;
   if (len > 0) currentProblemIndex.value = getRandomInteger(0, len);
 
-  initEncounter();
+  initEncounter(); // uses latest mastered counts if backfill finished
   startBtn.value?.focus();
 });
 
