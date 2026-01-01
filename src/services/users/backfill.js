@@ -16,7 +16,6 @@ export async function backfillMasteryForUser(userId) {
       req.onerror = () => reject(req.error);
     }),
   ]);
-  console.log('backfill user:', user);
 
   let mult = 0,
     div = 0;

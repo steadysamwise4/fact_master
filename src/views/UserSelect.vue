@@ -127,11 +127,13 @@ import {
   useUserProblems,
   useUsers,
 } from '@/composables/useDatabase';
+import { DB_VERSION } from '@/services/db';
+import { backfillMasteryForUser } from '../services/users/backfill';
 
 const router = useRouter();
 
 const { addUser, users, removeUser } = useUsers();
-console.log('users:', users);
+
 const {
   loading: problemsLoading,
   error: problemsError,
@@ -184,7 +186,13 @@ function toggleSelected(user) {
   selectedUser.value = selectedUser.value?.id === user.id ? null : user;
 }
 
-function startBattle(user, kind) {
+async function startBattle(user, kind) {
+  const k = 'dataVersion';
+  const stored = Number(localStorage.getItem(k) || 0);
+  if (stored !== DB_VERSION) {
+    await backfillMasteryForUser(user.id).catch(console.warn);
+    localStorage.setItem(k, String(DB_VERSION));
+  }
   router.push({
     name: 'Battle',
     params: { userId: user.id },

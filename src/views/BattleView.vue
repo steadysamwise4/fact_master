@@ -161,6 +161,9 @@ import { pickMonsterByOp } from '../services/assets/monsters';
 import { playerSprites } from '../services/assets/heroes';
 import { backfillMasteryForUser } from '../services/users/backfill';
 import { PROBLEM_TOTALS } from '../config/problems';
+import { tierFromMastery } from '../services/game/tiers';
+import { devLog } from '../utils/devLog';
+import { verifyMasteryCounters } from '../services/users/verify';
 
 const userXpTotal = ref(0);
 const userXpToNext = ref(xpToNext(1));
@@ -294,6 +297,7 @@ const { progress, running, lastDurationSec, start, stop, reset } = useRafTimer(
 );
 
 async function onTimerDone() {
+  playerAnswer.value = '';
   await enemyAttack();
   if (enemyHp.value <= 0) {
     await handleVictory();
@@ -323,7 +327,7 @@ const enemyHpPercent = computed(
 const playerSprite = computed(() => playerSprites['Knight']); // Placeholder
 const hintText = computed(() => {
   const p = currentProblem.value;
-  console.log('currentProblem:', currentProblem.value);
+
   if (!p.question) return '';
   return p.answer;
 });
@@ -394,6 +398,19 @@ function initEncounter() {
     damage: 6 + tier(userLevel.value), // simple enemy dmg scaling
   };
   enemyHp.value = currentEnemy.value.maxHp;
+  const t = tierFromMastery(mastered, total);
+  devLog(
+    'op:',
+    kind.value,
+    'tier:',
+    t,
+    'mastered:',
+    mastered,
+    '/',
+    total,
+    'enemy:',
+    currentEnemy.value.name
+  );
 }
 
 const submitAnswer = async () => {
@@ -424,8 +441,12 @@ const submitAnswer = async () => {
 
   // Check for battle end
   if (enemyHp.value <= 0) {
+    if (import.meta.env.DEV)
+      verifyMasteryCounters(currentUser.value.id).catch(console.warn);
     await handleVictory();
   } else if (playerHp.value <= 0) {
+    if (import.meta.env.DEV)
+      verifyMasteryCounters(currentUser.value.id).catch(console.warn);
     await handleDefeat();
   } else {
     // Next question
@@ -572,12 +593,20 @@ const updateProblemStats = async (problem, newTime, isCorrect) => {
     if (nowMastered && !wasMastered) {
       masteredMult.value = (masteredMult.value ?? 0) + 1;
       userPatch.totalMultMastered = (user.totalMultMastered ?? 0) + 1;
+      devLog('mastered +1', problemType, 'now:', {
+        mult: masteredMult.value,
+        div: masteredDiv.value,
+      });
     } else if (!nowMastered && wasMastered) {
       masteredMult.value = Math.max(0, (masteredMult.value ?? 0) - 1);
       userPatch.totalMultMastered = Math.max(
         0,
         (user.totalMultMastered ?? 0) - 1
       );
+      devLog('mastered -1', problemType, 'now:', {
+        mult: masteredMult.value,
+        div: masteredDiv.value,
+      });
     }
   } else {
     if (nowMastered && !wasMastered) {
@@ -602,7 +631,6 @@ const handleVictory = async () => {
   grantXp(currentEnemy.value.maxHp); // kill bonus
   await persistUserProgress();
 
-  console.log('userXpTotal:', userXpTotal.value);
   const { level, xpRemaining } = levelFromTotalXp(userXpTotal.value);
   console.log('xpRemaining:', xpRemaining);
   console.log('level:', level);
@@ -682,7 +710,7 @@ onMounted(async () => {
   const user = await getOneUser(uid);
   if (!user) throw new Error(`User ${uid} not found`);
   currentUser.value = user;
-  console.log('currentUser.value', currentUser.value);
+
   userLevel.value = user.level ?? 1;
   userXpTotal.value = user.xp ?? 0;
   userXpToNext.value = xpToNext(userLevel.value);
@@ -1010,6 +1038,7 @@ onBeforeUnmount(() => clearInterval(hintInterval));
 }
 
 /* Battle UI */
+
 .center-ui {
   width: 100%;
   display: flex;
@@ -1038,6 +1067,11 @@ onBeforeUnmount(() => clearInterval(hintInterval));
   align-items: flex-start; /* start from top of this area */
   padding-bottom: 16px;
   margin-top: auto;
+  background: none;
+}
+
+.battle-ui.question,
+.battle-ui.message {
   background: linear-gradient(
     to bottom,
     transparent 0%,
@@ -1176,7 +1210,7 @@ onBeforeUnmount(() => clearInterval(hintInterval));
 }
 
 .message-box {
-  min-height: 100px;
+  /* min-height: 100px; */
   display: flex;
   align-items: center;
   justify-content: center;
