@@ -17,15 +17,12 @@
           </div>
           <div class="enemy-info">
             <div class="enemy-name">{{ currentEnemy.name }}</div>
-            <div class="hp-bar">
-              <div
-                class="hp-fill enemy-hp"
-                :style="{ width: enemyHpPercent + '%' }"
-              ></div>
-            </div>
-            <div class="hp-text">
-              HP: {{ enemyHp }} / {{ currentEnemy.maxHp }}
-            </div>
+            <HealthBar
+              :value="enemyHp"
+              :max="currentEnemy.maxHp"
+              variant="enemy"
+              :height="24"
+            />
           </div>
 
           <!-- Damage numbers -->
@@ -116,13 +113,12 @@
           </div>
           <div class="player-info">
             <div class="player-name">{{ playerName }}</div>
-            <div class="hp-bar">
-              <div
-                class="hp-fill player-hp"
-                :style="{ width: playerHpPercent + '%' }"
-              ></div>
-            </div>
-            <div class="hp-text">HP: {{ playerHp }} / {{ playerMaxHp }}</div>
+            <HealthBar
+              :value="playerHp"
+              :max="playerMaxHp"
+              variant="player"
+              :height="24"
+            />
           </div>
         </div>
       </div>
@@ -134,6 +130,7 @@
 </template>
 
 <script setup>
+import HealthBar from '@/components/HealthBar.vue';
 import {
   ref,
   computed,
@@ -875,42 +872,6 @@ onBeforeUnmount(() => clearInterval(hintInterval));
   text-align: center;
   margin-bottom: 10px;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-}
-
-/* HP Bars */
-.hp-bar {
-  width: 100%;
-  height: 24px;
-  background: #2a1810;
-  border: 2px solid #8b6914;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.hp-fill {
-  height: 100%;
-  transition: width 0.5s ease;
-  background: linear-gradient(to bottom, #4ade80 0%, #22c55e 100%);
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-}
-
-.hp-fill.enemy-hp {
-  background: linear-gradient(to bottom, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-}
-
-.hp-fill.player-hp {
-  background: linear-gradient(to bottom, #60a5fa 0%, #3b82f6 100%);
-  box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
-}
-
-.hp-text {
-  color: #e0d5c7;
-  font-size: 0.9rem;
-  text-align: center;
-  font-weight: bold;
 }
 
 /* Damage Numbers */
