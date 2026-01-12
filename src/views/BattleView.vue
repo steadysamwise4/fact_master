@@ -7,14 +7,17 @@
       <div class="side enemy-side">
         <!-- Enemy Section -->
         <div class="section enemy-section">
-          <div class="enemy-card">
-            <div
-              class="enemy-sprite"
-              :class="{ shake: enemyTakingDamage, 'fade-out': enemyDefeated }"
-            >
-              <img :src="currentEnemy.sprite" :alt="currentEnemy.name" />
-            </div>
-          </div>
+          <SpriteCard
+            :src="currentEnemy.sprite"
+            :alt="currentEnemy.name"
+            :size="220"
+            borderColor="#8b6914"
+            :spriteClasses="{
+              shake: enemyTakingDamage,
+              'fade-out': enemyDefeated,
+              attack: enemyAttacking,
+            }"
+          />
           <div class="enemy-info">
             <div class="enemy-name">{{ currentEnemy.name }}</div>
             <HealthBar
@@ -103,14 +106,16 @@
       <div class="side hero-side">
         <!-- Player Section -->
         <div class="section player-section">
-          <div class="hero-card">
-            <div
-              class="player-sprite"
-              :class="{ attack: playerAttacking, hurt: playerTakingDamage }"
-            >
-              <img :src="playerSprite" alt="Hero" />
-            </div>
-          </div>
+          <SpriteCard
+            :src="playerSprite"
+            alt="Hero"
+            :size="200"
+            borderColor="#4067b8"
+            :spriteClasses="{
+              attack: playerAttacking,
+              shake: playerTakingDamage,
+            }"
+          />
           <div class="player-info">
             <div class="player-name">{{ playerName }}</div>
             <HealthBar
@@ -131,6 +136,7 @@
 
 <script setup>
 import HealthBar from '@/components/HealthBar.vue';
+import SpriteCard from '@/components/SpriteCard.vue';
 import {
   ref,
   computed,
@@ -225,6 +231,7 @@ const playerHp = ref(playerMaxHp.value);
 const playerAnswer = ref('');
 const answerInput = ref(null);
 const playerAttacking = ref(false);
+const enemyAttacking = ref(false);
 const playerTakingDamage = ref(false);
 const xpGained = ref(0);
 const lastLevel = ref(1);
@@ -484,8 +491,9 @@ const playerAttack = async () => {
 const enemyAttack = async () => {
   battleState.value = 'message';
   battleMessage.value = `Wrong answer! ${currentEnemy.value.name} attacks!`;
-
+  enemyAttacking.value = true;
   await sleep(1000);
+  enemyAttacking.value = false;
 
   // Enemy damages player
   const damage = currentEnemy.value.damage;
@@ -790,72 +798,6 @@ onBeforeUnmount(() => clearInterval(hintInterval));
   border-color: #8b6914;
 }
 
-.enemy-sprite,
-.player-sprite {
-  width: 220px; /* was 150px */
-  height: 220px;
-  margin-bottom: 16px;
-  position: relative;
-  image-rendering: pixelated;
-}
-
-.enemy-sprite img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.enemy-card {
-  background: rgba(0, 0, 0, 0.6);
-  border: 3px solid #8b6914;
-  border-radius: 10px;
-  padding: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1px rgba(255, 215, 0, 0.1);
-}
-
-/* optional decorative border */
-.enemy-card::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  /* border-radius: 14px; */
-  /* border: 2px solid rgba(255, 215, 0, 0.25); */
-  pointer-events: none;
-}
-
-.enemy-sprite.shake {
-  animation: shake 0.3s;
-}
-
-.enemy-sprite.fade-out {
-  animation: fadeOut 1s forwards;
-}
-
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-10px) rotate(-5deg);
-  }
-  75% {
-    transform: translateX(10px) rotate(5deg);
-  }
-}
-
-@keyframes fadeOut {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.5) translateY(50px);
-  }
-}
-
 .enemy-info {
   background: rgba(0, 0, 0, 0.7);
   border: 2px solid #8b6914;
@@ -915,69 +857,8 @@ onBeforeUnmount(() => clearInterval(hintInterval));
   justify-self: end;
 }
 
-.player-sprite img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
 .player-section {
   border-color: #4067b8;
-}
-
-.hero-card {
-  position: relative;
-  background: rgba(0, 0, 0, 0.6);
-  border: 3px solid #4067b8; /* blue-gold pair for hero */
-  border-radius: 10px;
-  padding: 12px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5),
-    inset 0 0 0 1px rgba(96, 165, 250, 0.12);
-}
-
-.hero-card::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  /* border-radius: 14px;
-  border: 2px solid rgba(96, 165, 250, 0.25); */
-  pointer-events: none;
-}
-
-/* keep your attack/hurt keyframes; this just scales better sprites */
-.player-sprite.attack {
-  animation: attackLunge 0.5s;
-}
-.player-sprite.hurt {
-  animation: hurt 0.5s;
-}
-
-@keyframes attackLunge {
-  0% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-40px);
-  }
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes hurt {
-  0%,
-  100% {
-    transform: translateX(0);
-    filter: brightness(1);
-  }
-  25% {
-    transform: translateX(-5px);
-    filter: brightness(1.5) hue-rotate(-20deg);
-  }
-  75% {
-    transform: translateX(5px);
-    filter: brightness(1.5) hue-rotate(-20deg);
-  }
 }
 
 .player-info {
@@ -1291,16 +1172,6 @@ onBeforeUnmount(() => clearInterval(hintInterval));
 
 /* Responsive */
 @media (max-width: 768px) {
-  .enemy-sprite {
-    width: 120px;
-    height: 120px;
-  }
-
-  .player-sprite {
-    width: 100px;
-    height: 100px;
-  }
-
   .problem-text {
     font-size: 2rem;
   }

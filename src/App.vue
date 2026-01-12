@@ -40,6 +40,67 @@ body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+.sprite.shake {
+  animation: shake 0.3s;
+}
+.sprite.fade-out {
+  animation: fadeOut 1s forwards;
+}
+.sprite.attack {
+  animation: attackLunge 0.5s;
+}
+.sprite.hurt {
+  animation: hurt 0.45s;
+}
+
+/* keyframes also global */
+@keyframes attackLunge {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-28px) scale(1.03);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes hurt {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: none;
+  }
+  25% {
+    transform: translateX(-8px) brightness(1.4) saturate(1.2);
+  }
+  75% {
+    transform: translateX(8px) brightness(1.4) saturate(1.2);
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px) rotate(-3deg);
+  }
+  75% {
+    transform: translateX(10px) rotate(3deg);
+  }
+}
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6) translateY(40px);
+  }
+}
 </style>
 
 <!-- <template><Header /><CreateUser /></template>
